@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { connectGitlab } from './providers/gitlab/gitlab-auth';
 import { getGithubSession } from './providers/github/github-auth';
+import { clearCache } from './state/cache';
 
 class EmptyBranchesProvider implements vscode.TreeDataProvider<never> {
   getTreeItem(element: never): vscode.TreeItem {
@@ -27,7 +28,11 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.window.showInformationMessage('Pollard: Refresh (not implemented yet)');
     }),
     vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
-    vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context))
+    vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context)),
+    vscode.commands.registerCommand('pollard.clearCache', async () => {
+      await clearCache(context);
+      vscode.window.showInformationMessage('Pollard: Cache cleared.');
+    })
   );
 }
 

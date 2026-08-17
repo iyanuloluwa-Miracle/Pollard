@@ -70,6 +70,10 @@
       {
         "command": "pollard.connectGitlab",
         "title": "Pollard: Connect GitLab"
+      },
+      {
+        "command": "pollard.clearCache",
+        "title": "Pollard: Clear Cache"
       }
     ],
     "configuration": {
@@ -84,6 +88,12 @@
           "type": "string",
           "default": "",
           "description": "Self-hosted GitLab base URL (e.g. https://gitlab.mycompany.com), if not using gitlab.com"
+        },
+        "pollard.cache.ttlMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "How long cached PR lookup results stay valid before a scan re-fetches them, in minutes"
         }
       }
     }
