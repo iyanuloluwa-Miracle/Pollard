@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { CleanDeps } from '../clean/clean';
+import { getBackupsRetentionDays } from '../config';
 import { RepoHandle } from '../git/repo-registry';
 import { BackupRefEntry, deleteBackupRef, listBackupRefs } from './backupRefs';
 
@@ -26,9 +27,7 @@ function writePruneResultsToLog(channel: vscode.OutputChannel, results: PruneRes
  * automatically.
  */
 export async function runPruneBackups(deps: CleanDeps): Promise<void> {
-  const retentionDays = vscode.workspace
-    .getConfiguration('pollard')
-    .get<number>('backups.retentionDays', 90);
+  const retentionDays = getBackupsRetentionDays();
   const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
   const repos = deps.registry.repos;

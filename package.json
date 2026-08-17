@@ -125,26 +125,70 @@
     "configuration": {
       "title": "Pollard",
       "properties": {
+        "pollard.protectedBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "main",
+            "master",
+            "develop",
+            "dev",
+            "staging",
+            "release/*",
+            "hotfix/*"
+          ],
+          "scope": "resource",
+          "description": "Glob patterns for branch names Pollard will never offer to delete, regardless of merge/PR status. \"*\" matches any characters, including \"/\", so \"release/*\" also matches \"release/2.0/hotfix\". By default your patterns are merged with Pollard's built-in defaults (main, master, develop, dev, staging, release/*, hotfix/*) — set pollard.protectedBranches.replaceDefaults to true to use only your patterns instead."
+        },
+        "pollard.protectedBranches.replaceDefaults": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "When true, pollard.protectedBranches replaces Pollard's built-in default protected-branch patterns instead of being merged with them. Has no effect if pollard.protectedBranches was never set, since the merged and replaced lists are then identical."
+        },
+        "pollard.minimumScoreForBulkDelete": {
+          "type": "number",
+          "default": 95,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum safety score a branch needs to be pre-checked by default in the Pollard: Clean selection list. Branches below this score are still listed and can be selected manually. Defaults to 95 — the SAFE_SQUASH_MERGED score — so only fully- or squash-merged branches are pre-selected out of the box."
+        },
+        "pollard.gitlabHost": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Hostname only (e.g. gitlab.mycompany.com — no scheme or path) of a self-hosted GitLab instance, if not using gitlab.com. Leave empty to only recognize gitlab.com remotes."
+        },
         "pollard.github.enterpriseHost": {
           "type": "string",
           "default": "",
-          "description": "GitHub Enterprise hostname (e.g. github.mycompany.com), if not using github.com"
+          "scope": "resource",
+          "description": "Hostname only (e.g. github.mycompany.com — no scheme or path) of a GitHub Enterprise Server instance, if not using github.com. Leave empty to only recognize github.com remotes."
         },
-        "pollard.gitlab.instanceUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Self-hosted GitLab base URL (e.g. https://gitlab.mycompany.com), if not using gitlab.com"
-        },
-        "pollard.cache.ttlMinutes": {
+        "pollard.cacheTtlMinutes": {
           "type": "number",
           "default": 30,
           "minimum": 1,
-          "description": "How long cached PR lookup results stay valid before a scan re-fetches them, in minutes"
+          "description": "How long cached pull request lookup results stay valid before Pollard: Scan re-fetches them from GitHub/GitLab, in minutes. Lower values keep PR status fresher at the cost of more API calls."
+        },
+        "pollard.logLevel": {
+          "type": "string",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "default": "info",
+          "description": "Minimum severity of diagnostic messages Pollard would record, from least to most verbose: off, error, warn, info, debug. Reserved for a future diagnostics output channel — this version does not yet produce any log output at any level."
         },
         "pollard.autoScanOnStartup": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically run Pollard: Scan when a workspace with a Git repository is opened. Off by default — scanning contacts GitHub/GitLab."
+          "description": "Automatically run Pollard: Scan when a workspace with a Git repository is opened. Off by default — scanning contacts GitHub/GitLab and may prompt for authentication."
         },
         "pollard.autoScanIntervalMinutes": {
           "type": "number",

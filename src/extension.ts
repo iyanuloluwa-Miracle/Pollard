@@ -3,6 +3,7 @@ import { runPruneBackups } from './backup/prune';
 import { runRestore } from './backup/restore';
 import { CleanDeps, runClean, runCleanSingleBranch } from './clean/clean';
 import { registerCleanPreviewProvider } from './clean/preview';
+import { getAutoScanIntervalMinutes, getAutoScanOnStartup } from './config';
 import { RepoRegistry } from './git/repo-registry';
 import { connectGitlab } from './providers/gitlab/gitlab-auth';
 import { getGithubSession } from './providers/github/github-auth';
@@ -53,11 +54,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Both auto-scan mechanisms are strictly opt-in and default off — a fresh
   // install never scans (and never contacts GitHub/GitLab) automatically.
-  const config = vscode.workspace.getConfiguration('pollard');
-  if (config.get<boolean>('autoScanOnStartup', false)) {
+  if (getAutoScanOnStartup()) {
     void runScan(scanDeps);
   }
-  const intervalMinutes = config.get<number>('autoScanIntervalMinutes', 0);
+  const intervalMinutes = getAutoScanIntervalMinutes();
   if (intervalMinutes > 0) {
     const effectiveMinutes = Math.max(intervalMinutes, MIN_AUTO_SCAN_INTERVAL_MINUTES);
     const handle = setInterval(() => void runScan(scanDeps), effectiveMinutes * 60_000);

@@ -1,5 +1,6 @@
 import { Ref } from './git-api-types';
 import { REF_TYPE_REMOTE_HEAD, pickPrimaryRemoteName } from './git-extension';
+import { matchesAnyPattern } from './protected-branches';
 import { RepoHandle, RepoRegistry } from './repo-registry';
 import { BranchFacts, MergeStatus } from '../safety/engine';
 
@@ -146,7 +147,8 @@ async function computeIsAncestorOfAnotherLocalBranch(
 export async function computeLocalBranchFacts(
   registry: RepoRegistry,
   repo: RepoHandle,
-  defaultBranch: DefaultBranchInfo | undefined
+  defaultBranch: DefaultBranchInfo | undefined,
+  protectedBranchPatterns: string[]
 ): Promise<Map<string, Omit<BranchFacts, 'pullRequest'>>> {
   const allRefs = registry.getRefs(repo.id) ?? [];
   const remoteRefs = allRefs.filter((r) => r.type === REF_TYPE_REMOTE_HEAD);
@@ -169,7 +171,9 @@ export async function computeLocalBranchFacts(
 
     result.set(branch.name, {
       isCurrent: branch.name === repo.currentBranch,
-      isProtected: defaultBranch !== undefined && branch.name === defaultBranch.name,
+      isProtected:
+        (defaultBranch !== undefined && branch.name === defaultBranch.name) ||
+        matchesAnyPattern(branch.name, protectedBranchPatterns),
       mergeStatus,
       isPushed,
       existsOnRemote: computeExistsOnRemote(remoteRefs, branch.name),

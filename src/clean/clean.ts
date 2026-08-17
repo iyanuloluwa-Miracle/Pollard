@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { writeBackupRef, restoreBranchFromBackup } from '../backup/backupRefs';
+import { getMinimumScoreForBulkDelete } from '../config';
 import { pickRepo } from '../git/pickRepo';
 import { RepoHandle, RepoRegistry } from '../git/repo-registry';
 import { SafetyStatus } from '../safety/engine';
@@ -73,7 +74,10 @@ interface CleanQuickPickItem extends vscode.QuickPickItem {
   candidate: CleanCandidate;
 }
 
-function buildQuickPickItems(candidates: CleanCandidate[]): CleanQuickPickItem[] {
+function buildQuickPickItems(
+  candidates: CleanCandidate[],
+  minimumScoreForBulkDelete: number
+): CleanQuickPickItem[] {
   const sorted = [...candidates].sort(
     (a, b) =>
       b.branchAssessment.assessment.score - a.branchAssessment.assessment.score ||
@@ -86,7 +90,7 @@ function buildQuickPickItems(candidates: CleanCandidate[]): CleanQuickPickItem[]
       label: c.branchName,
       description: `${status} · score ${score}`,
       detail: reasons.join(' • '),
-      picked: status === 'SAFE_MERGED' || status === 'SAFE_SQUASH_MERGED',
+      picked: score >= minimumScoreForBulkDelete,
       iconPath: new vscode.ThemeIcon(icon, color ? new vscode.ThemeColor(color) : undefined),
       candidate: c,
     };
@@ -328,7 +332,7 @@ export async function runClean(deps: CleanDeps): Promise<void> {
     return;
   }
 
-  const items = buildQuickPickItems(candidates);
+  const items = buildQuickPickItems(candidates, getMinimumScoreForBulkDelete());
   const picked = await vscode.window.showQuickPick(items, {
     canPickMany: true,
     matchOnDescription: true,

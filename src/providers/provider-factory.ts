@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getGitHubEnterpriseHost, getGitLabHost } from '../config';
 import { ParsedRemote } from '../git/remote-url';
 import { GitHubProvider } from './github/github-provider';
 import { GitLabProvider } from './gitlab/gitlab-provider';
@@ -8,18 +9,19 @@ import { Provider } from './types';
 export interface CreateProviderOptions {
   context: vscode.ExtensionContext;
   remote: ParsedRemote | undefined;
+  /** Repo root path — threads through to gitlabHost/github.enterpriseHost, both resource-scoped settings. */
+  resourcePath?: string;
 }
 
 /**
  * Picks GitHub, GitLab, or a NoopProvider based on the parsed remote's host,
  * matching github.com/gitlab.com or the configured enterprise/self-hosted host.
  */
-export function createProvider({ context, remote }: CreateProviderOptions): Provider {
+export function createProvider({ context, remote, resourcePath }: CreateProviderOptions): Provider {
   if (!remote) return new NoopProvider();
 
-  const config = vscode.workspace.getConfiguration('pollard');
-  const githubEnterpriseHost = config.get<string>('github.enterpriseHost')?.toLowerCase();
-  const gitlabInstanceHost = hostOf(config.get<string>('gitlab.instanceUrl'));
+  const githubEnterpriseHost = getGitHubEnterpriseHost(resourcePath);
+  const gitlabInstanceHost = getGitLabHost(resourcePath);
 
   if (
     remote.host === 'github.com' ||
@@ -35,13 +37,4 @@ export function createProvider({ context, remote }: CreateProviderOptions): Prov
     );
   }
   return new NoopProvider();
-}
-
-function hostOf(url: string | undefined): string | undefined {
-  if (!url) return undefined;
-  try {
-    return new URL(url).host.toLowerCase();
-  } catch {
-    return undefined;
-  }
 }

@@ -1,3 +1,4 @@
+import { getProtectedBranchPatterns } from '../config';
 import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branch-facts';
 import { primaryRemoteFetchUrl } from '../git/git-extension';
 import { PullRequestInfo } from '../providers/types';
@@ -19,7 +20,13 @@ export async function runRefresh({
 }: ScanDeps): Promise<void> {
   for (const repo of registry.repos) {
     const defaultBranch = await resolveDefaultBranch(registry, repo);
-    const localFacts = await computeLocalBranchFacts(registry, repo, defaultBranch);
+    const protectedBranchPatterns = getProtectedBranchPatterns(repo.rootPath);
+    const localFacts = await computeLocalBranchFacts(
+      registry,
+      repo,
+      defaultBranch,
+      protectedBranchPatterns
+    );
 
     const cache = new RepoCache(context, repo.rootPath, primaryRemoteFetchUrl(repo.remotes));
     const prsByBranch = new Map<string, PullRequestInfo[]>();

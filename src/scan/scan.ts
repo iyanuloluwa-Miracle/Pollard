@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getProtectedBranchPatterns } from '../config';
 import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branch-facts';
 import { primaryRemoteFetchUrl, resolvePrimaryParsedRemote } from '../git/git-extension';
 import { AuthRequiredError, RateLimitedError } from '../providers/errors';
@@ -52,7 +53,11 @@ async function doRunScan({
       for (const repo of repos) {
         if (token.isCancellationRequested) break;
         const defaultBranch = await resolveDefaultBranch(registry, repo);
-        localFactsByRepo.set(repo.id, await computeLocalBranchFacts(registry, repo, defaultBranch));
+        const protectedBranchPatterns = getProtectedBranchPatterns(repo.rootPath);
+        localFactsByRepo.set(
+          repo.id,
+          await computeLocalBranchFacts(registry, repo, defaultBranch, protectedBranchPatterns)
+        );
         progress.report({ increment: localIncrement });
       }
 
@@ -82,7 +87,11 @@ async function doRunScan({
         }
 
         const parsedRemote = resolvePrimaryParsedRemote(repo.remotes);
-        const provider = createProvider({ context, remote: parsedRemote });
+        const provider = createProvider({
+          context,
+          remote: parsedRemote,
+          resourcePath: repo.rootPath,
+        });
 
         if (provider.id !== 'noop') {
           anyAuthNeeded = true;
