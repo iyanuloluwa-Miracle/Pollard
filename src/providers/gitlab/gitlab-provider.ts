@@ -1,0 +1,113 @@
+import * as vscode from 'vscode';
+import { ParsedRemote } from '../../git/remote-url';
+import { AuthRequiredError } from '../errors';
+import { fetchJson } from '../http';
+import { RateLimiter } from '../rate-limit';
+import { Provider, PullRequestInfo, RateLimitStatus } from '../types';
+import { getGitlabToken } from './gitlab-auth';
+import {
+  GitLabMergeRequest,
+  branchUrl,
+  mergeRequestsPageUrl,
+  toPullRequestInfo,
+} from './gitlab-api';
+
+const MAX_PAGES = 10;
+
+/**
+ * GitLab's merge_requests endpoint filters by one source_branch at a time —
+ * there's no OR-filter across branches, so the real batching lever is
+ * paginating the full MR list once and indexing it client-side by branch,
+ * rather than issuing one request per branch. Sorted by most-recently-updated
+ * so requested branches are usually found within the first page or two, and
+ * pagination stops as soon as every requested branch has been located.
+ */
+async function fetchMergeRequestsIndex(
+  apiBase: string,
+  remote: ParsedRemote,
+  token: string,
+  wantedBranches: Set<string>,
+  rateLimiter: RateLimiter
+): Promise<Map<string, GitLabMergeRequest[]>> {
+  const index = new Map<string, GitLabMergeRequest[]>();
+  const found = new Set<string>();
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    rateLimiter.throwIfLimited();
+    const url = mergeRequestsPageUrl(apiBase, remote, page);
+    const { data, response } = await fetchJson<GitLabMergeRequest[]>(url, {
+      headers: { 'PRIVATE-TOKEN': token },
+    });
+
+    if (response.status === 403 || response.status === 429) {
+      rateLimiter.noteThrottled(response.headers.get('retry-after'));
+      break;
+    }
+    rateLimiter.updateFromHeaders(response.headers, 'gitlab');
+
+    for (const mr of data ?? []) {
+      if (!index.has(mr.source_branch)) index.set(mr.source_branch, []);
+      index.get(mr.source_branch)?.push(mr);
+      if (wantedBranches.has(mr.source_branch)) found.add(mr.source_branch);
+    }
+
+    const nextPage = response.headers.get('x-next-page');
+    if (!nextPage || found.size === wantedBranches.size) break;
+  }
+  return index;
+}
+
+export class GitLabProvider implements Provider {
+  readonly id = 'gitlab' as const;
+
+  private readonly rateLimiter = new RateLimiter();
+  private readonly apiBase: string;
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly remote: ParsedRemote,
+    instanceHost?: string
+  ) {
+    this.apiBase = `https://${instanceHost ?? 'gitlab.com'}/api/v4`;
+  }
+
+  async getPullRequestsForBranches(branches: string[]): Promise<Map<string, PullRequestInfo[]>> {
+    this.rateLimiter.throwIfLimited();
+    const token = await getGitlabToken(this.context);
+    if (!token) throw new AuthRequiredError('gitlab');
+
+    const index = await fetchMergeRequestsIndex(
+      this.apiBase,
+      this.remote,
+      token,
+      new Set(branches),
+      this.rateLimiter
+    );
+
+    const out = new Map<string, PullRequestInfo[]>();
+    for (const branch of branches) {
+      const mrs = index.get(branch);
+      if (mrs?.length) out.set(branch, mrs.map(toPullRequestInfo));
+    }
+    return out;
+  }
+
+  async branchExistsOnRemote(branch: string): Promise<boolean> {
+    this.rateLimiter.throwIfLimited();
+    const token = await getGitlabToken(this.context);
+    if (!token) throw new AuthRequiredError('gitlab');
+
+    const { response } = await fetchJson(branchUrl(this.apiBase, this.remote, branch), {
+      headers: { 'PRIVATE-TOKEN': token },
+    });
+    if (response.status === 403 || response.status === 429) {
+      this.rateLimiter.noteThrottled(response.headers.get('retry-after'));
+    }
+    this.rateLimiter.updateFromHeaders(response.headers, 'gitlab');
+    return response.status === 200;
+  }
+
+  getRateLimitStatus(): RateLimitStatus {
+    return this.rateLimiter.getStatus();
+  }
+}
