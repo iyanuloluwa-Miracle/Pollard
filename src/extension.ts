@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { connectGitlab } from './providers/gitlab/gitlab-auth';
+import { getGithubSession } from './providers/github/github-auth';
 
 class EmptyBranchesProvider implements vscode.TreeDataProvider<never> {
   getTreeItem(element: never): vscode.TreeItem {
@@ -23,7 +25,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('pollard.refresh', () => {
       vscode.window.showInformationMessage('Pollard: Refresh (not implemented yet)');
-    })
+    }),
+    vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
+    vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context))
   );
 }
 

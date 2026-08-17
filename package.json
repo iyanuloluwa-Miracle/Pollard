@@ -47,11 +47,46 @@
       ]
     },
     "commands": [
-      { "command": "pollard.scan", "title": "Pollard: Scan" },
-      { "command": "pollard.clean", "title": "Pollard: Clean" },
-      { "command": "pollard.restore", "title": "Pollard: Restore" },
-      { "command": "pollard.refresh", "title": "Pollard: Refresh" }
-    ]
+      {
+        "command": "pollard.scan",
+        "title": "Pollard: Scan"
+      },
+      {
+        "command": "pollard.clean",
+        "title": "Pollard: Clean"
+      },
+      {
+        "command": "pollard.restore",
+        "title": "Pollard: Restore"
+      },
+      {
+        "command": "pollard.refresh",
+        "title": "Pollard: Refresh"
+      },
+      {
+        "command": "pollard.connectGithub",
+        "title": "Pollard: Connect GitHub"
+      },
+      {
+        "command": "pollard.connectGitlab",
+        "title": "Pollard: Connect GitLab"
+      }
+    ],
+    "configuration": {
+      "title": "Pollard",
+      "properties": {
+        "pollard.github.enterpriseHost": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub Enterprise hostname (e.g. github.mycompany.com), if not using github.com"
+        },
+        "pollard.gitlab.instanceUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Self-hosted GitLab base URL (e.g. https://gitlab.mycompany.com), if not using gitlab.com"
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "node esbuild.js",
