@@ -46,6 +46,28 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "pollard.branches",
+        "when": "!pollard.hasGitRepo",
+        "contents": "No Git repository was found in this workspace.\n\nPollard needs an open folder containing a Git repository."
+      },
+      {
+        "view": "pollard.branches",
+        "when": "pollard.hasGitRepo && !pollard.hasScanned",
+        "contents": "No branches have been scanned yet.\n\n[Scan for Dead Branches](command:pollard.scan)"
+      },
+      {
+        "view": "pollard.branches",
+        "when": "pollard.hasGitRepo && pollard.hasScanned && !pollard.isSignedIn",
+        "contents": "Connect an account to check pull request status on your remote.\n\n[Connect GitHub](command:pollard.connectGithub)\n\n[Connect GitLab](command:pollard.connectGitlab)"
+      },
+      {
+        "view": "pollard.branches",
+        "when": "pollard.hasGitRepo && pollard.hasScanned && pollard.isSignedIn",
+        "contents": "No dead branches found. Nice and tidy!"
+      }
+    ],
     "commands": [
       {
         "command": "pollard.scan",

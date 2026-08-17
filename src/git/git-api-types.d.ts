@@ -5,6 +5,8 @@
  * runtime exports, so the slice actually used here is vendored by hand.
  */
 
+import type { Event } from 'vscode';
+
 export interface Remote {
   readonly name: string;
   readonly fetchUrl?: string;
@@ -24,13 +26,21 @@ export interface RepositoryState {
   readonly refs: Ref[];
 }
 
+export interface Commit {
+  readonly hash: string;
+  readonly commitDate?: Date;
+}
+
 export interface Repository {
   readonly rootUri: { readonly fsPath: string };
   readonly state: RepositoryState;
+  getCommit(ref: string): Promise<Commit>;
 }
 
 export interface API {
   readonly repositories: Repository[];
+  readonly onDidOpenRepository: Event<Repository>;
+  readonly onDidCloseRepository: Event<Repository>;
 }
 
 export interface GitExtension {

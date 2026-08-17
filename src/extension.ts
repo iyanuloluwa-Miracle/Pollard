@@ -1,20 +1,22 @@
 import * as vscode from 'vscode';
+import { RepoRegistry } from './git/repo-registry';
 import { connectGitlab } from './providers/gitlab/gitlab-auth';
 import { getGithubSession } from './providers/github/github-auth';
 import { clearCache } from './state/cache';
+import { BranchTreeProvider } from './views/branchTree';
 
-class EmptyBranchesProvider implements vscode.TreeDataProvider<never> {
-  getTreeItem(element: never): vscode.TreeItem {
-    return element;
-  }
-  getChildren(): Thenable<never[]> {
-    return Promise.resolve([]);
-  }
-}
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // No scan has run yet, so auth isn't known to be blocking anything —
+  // avoid greeting a first-time user with a sign-in warning.
+  void vscode.commands.executeCommand('setContext', 'pollard.isSignedIn', true);
 
-export function activate(context: vscode.ExtensionContext): void {
+  const registry = await RepoRegistry.create();
+  const branchTreeProvider = new BranchTreeProvider(registry);
+
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('pollard.branches', new EmptyBranchesProvider()),
+    registry,
+    branchTreeProvider,
+    vscode.window.registerTreeDataProvider('pollard.branches', branchTreeProvider),
     vscode.commands.registerCommand('pollard.scan', () => {
       vscode.window.showInformationMessage('Pollard: Scan (not implemented yet)');
     }),
@@ -25,7 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.window.showInformationMessage('Pollard: Restore (not implemented yet)');
     }),
     vscode.commands.registerCommand('pollard.refresh', () => {
-      vscode.window.showInformationMessage('Pollard: Refresh (not implemented yet)');
+      branchTreeProvider.refresh();
     }),
     vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
     vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context)),
