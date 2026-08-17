@@ -141,6 +141,7 @@ function watchRepoRefs(
 export class RepoRegistry implements vscode.Disposable {
   private readonly entries = new Map<string, RepoEntry>();
   private readonly disposables: vscode.Disposable[] = [];
+  private gitPath: string | undefined;
 
   private readonly _onDidChangeRepos = new vscode.EventEmitter<void>();
   readonly onDidChangeRepos = this._onDidChangeRepos.event;
@@ -158,6 +159,7 @@ export class RepoRegistry implements vscode.Disposable {
 
     const exports = ext.isActive ? ext.exports : await ext.activate();
     const api = exports.getAPI(1);
+    registry.gitPath = api.git?.path;
 
     for (const repository of api.repositories) {
       await registry.addRepo(repository);
@@ -235,6 +237,11 @@ export class RepoRegistry implements vscode.Disposable {
   /** Worktree-aware git/common dirs for a repo, or undefined if unresolved. Same resolution the ref watcher uses, exposed for direct ref file I/O (e.g. clean's backup mechanism) so callers never duplicate resolveGitDirs. */
   getGitDirs(repoId: string): { gitDir: string; commonDir: string } | undefined {
     return this.entries.get(repoId)?.gitDirs;
+  }
+
+  /** Resolved git executable from vscode.git; falls back to bare 'git' (PATH lookup) if unavailable. */
+  getGitPath(): string {
+    return this.gitPath ?? 'git';
   }
 
   /** Creates a local branch. Rejects on failure (e.g. name collision) — callers must catch per-branch, unlike the informational lookups above which swallow errors. */

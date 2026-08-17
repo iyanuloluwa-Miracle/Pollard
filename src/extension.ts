@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { runPruneBackups } from './backup/prune';
+import { runRestore } from './backup/restore';
 import { CleanDeps, runClean, runCleanSingleBranch } from './clean/clean';
 import { registerCleanPreviewProvider } from './clean/preview';
 import { RepoRegistry } from './git/repo-registry';
@@ -34,9 +36,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerTreeDataProvider('pollard.branches', branchTreeProvider),
     vscode.commands.registerCommand('pollard.scan', () => runScan(scanDeps)),
     vscode.commands.registerCommand('pollard.clean', () => runClean(cleanDeps)),
-    vscode.commands.registerCommand('pollard.restore', () => {
-      vscode.window.showInformationMessage('Pollard: Restore (not implemented yet)');
-    }),
+    vscode.commands.registerCommand('pollard.restore', () => runRestore(cleanDeps)),
+    vscode.commands.registerCommand('pollard.pruneBackups', () => runPruneBackups(cleanDeps)),
     vscode.commands.registerCommand('pollard.refresh', () => runRefresh(scanDeps)),
     vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
     vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context)),

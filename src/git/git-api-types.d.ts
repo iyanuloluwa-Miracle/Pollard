@@ -53,10 +53,16 @@ export interface Repository {
   deleteBranch(name: string, force?: boolean): Promise<void>;
 }
 
+/** Exposes the resolved git executable the built-in extension itself launched with. */
+export interface Git {
+  readonly path: string;
+}
+
 export interface API {
   readonly repositories: Repository[];
   readonly onDidOpenRepository: Event<Repository>;
   readonly onDidCloseRepository: Event<Repository>;
+  readonly git: Git;
 }
 
 export interface GitExtension {

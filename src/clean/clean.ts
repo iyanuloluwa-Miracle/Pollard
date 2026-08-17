@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import { writeBackupRef, restoreBranchFromBackup } from '../backup/backupRefs';
+import { pickRepo } from '../git/pickRepo';
 import { RepoHandle, RepoRegistry } from '../git/repo-registry';
 import { SafetyStatus } from '../safety/engine';
 import { tallyBucketCounts } from '../scan/assess';
 import { ScanDeps } from '../scan/types';
 import { BranchAssessment, BranchTreeElement, statusIconAndColor } from '../views/branchTree';
-import { createBackupRef, restoreBranchFromBackup } from './backup';
 import { PreviewEntry, clearPreviewContent, generatePreviewId, showCleanPreview } from './preview';
 
 export interface CleanDeps extends ScanDeps {
@@ -51,21 +52,6 @@ function isDeleted(
   r: BranchDeleteResult
 ): r is BranchDeleteResult & { outcome: { kind: 'deleted'; backupRefPath: string } } {
   return r.outcome.kind === 'deleted';
-}
-
-async function pickRepo(registry: RepoRegistry): Promise<RepoHandle | undefined> {
-  const repos = registry.repos;
-  if (repos.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No Git repository found in this workspace.');
-    return undefined;
-  }
-  if (repos.length === 1) return repos[0];
-
-  const picked = await vscode.window.showQuickPick(
-    repos.map((r) => ({ label: r.label, description: r.rootPath, repo: r })),
-    { title: 'Pollard: Clean — choose a repository' }
-  );
-  return picked?.repo;
 }
 
 function buildEligibleCandidates(
@@ -164,7 +150,7 @@ async function deleteWithBackup(
 
   let backupRefPath: string;
   try {
-    ({ refPath: backupRefPath } = await createBackupRef(registry, repoId, branchName, sha));
+    ({ refPath: backupRefPath } = await writeBackupRef(registry, repoId, branchName, sha));
   } catch (err) {
     // Fail-safe: never delete without a safety net.
     return { repoId, branchName, sha, outcome: { kind: 'backupFailed', error: String(err) } };
@@ -327,7 +313,7 @@ async function runCleanFlow(
 
 /** Entry point 1: Command Palette / toolbar. Repo-picks (if needed), then the multi-select QuickPick, then runCleanFlow. */
 export async function runClean(deps: CleanDeps): Promise<void> {
-  const repo = await pickRepo(deps.registry);
+  const repo = await pickRepo(deps.registry, 'Pollard: Clean — choose a repository');
   if (!repo) return;
 
   const assessments = deps.branchTreeProvider.getAssessments(repo.id);

@@ -101,6 +101,10 @@
         "command": "pollard.deleteBranch",
         "title": "Pollard: Delete Branch",
         "icon": "$(trash)"
+      },
+      {
+        "command": "pollard.pruneBackups",
+        "title": "Pollard: Prune Backups"
       }
     ],
     "menus": {
@@ -147,6 +151,12 @@
           "default": 0,
           "minimum": 0,
           "description": "Automatically re-run Pollard: Scan on this interval, in minutes. 0 disables periodic scanning (default). Values below 5 are treated as 5 minutes."
+        },
+        "pollard.backups.retentionDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "description": "Backup refs (refs/pollard/backups/...) older than this are eligible for deletion by Pollard: Prune Backups. Pruning never runs automatically — only on explicit command invocation."
         }
       }
     }
