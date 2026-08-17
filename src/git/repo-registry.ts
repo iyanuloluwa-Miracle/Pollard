@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { GitExtension, Repository } from './git-api-types';
+import { Branch, GitExtension, Ref, Repository } from './git-api-types';
 import { REF_TYPE_HEAD, RemoteInfo } from './git-extension';
 
 export interface RepoHandle {
@@ -23,6 +23,8 @@ interface RepoEntry {
   repository: Repository;
   watcher: vscode.Disposable | undefined;
   commitDateCache: Map<string, Date | typeof NO_DATE | Promise<Date | undefined>>;
+  /** Keyed by [shaA,shaB].sort().join('|') — merge-base is symmetric for a two-ref lookup. */
+  mergeBaseCache: Map<string, Promise<string | undefined>>;
 }
 
 function toHandle(repository: Repository): RepoHandle {
@@ -199,6 +201,36 @@ export class RepoRegistry implements vscode.Disposable {
     return pending;
   }
 
+  /** Raw refs (local + remote-tracking + tags) for a repo, straight from state.refs. */
+  getRefs(repoId: string): Ref[] | undefined {
+    return this.entries.get(repoId)?.repository.state.refs;
+  }
+
+  /** Cached, never-throws merge-base lookup. undefined = indeterminate (matches the safety engine's 'unknown' semantics). */
+  async getMergeBase(repoId: string, shaA: string, shaB: string): Promise<string | undefined> {
+    const entry = this.entries.get(repoId);
+    if (!entry) return undefined;
+
+    const key = [shaA, shaB].sort().join('|');
+    const cached = entry.mergeBaseCache.get(key);
+    if (cached) return cached;
+
+    const pending = entry.repository.getMergeBase(shaA, shaB).catch(() => undefined);
+    entry.mergeBaseCache.set(key, pending);
+    return pending;
+  }
+
+  /** Uncached — upstream state can change between calls (e.g. remote branch just deleted). Never throws. */
+  async getBranchDetails(repoId: string, name: string): Promise<Branch | undefined> {
+    const entry = this.entries.get(repoId);
+    if (!entry) return undefined;
+    try {
+      return await entry.repository.getBranch(name);
+    } catch {
+      return undefined;
+    }
+  }
+
   private async addRepo(repository: Repository): Promise<void> {
     const repoId = repository.rootUri.fsPath;
     let watcher: vscode.Disposable | undefined;
@@ -214,7 +246,12 @@ export class RepoRegistry implements vscode.Disposable {
       watcher = undefined;
     }
 
-    this.entries.set(repoId, { repository, watcher, commitDateCache: new Map() });
+    this.entries.set(repoId, {
+      repository,
+      watcher,
+      commitDateCache: new Map(),
+      mergeBaseCache: new Map(),
+    });
   }
 
   private removeRepo(repoId: string): void {

@@ -116,6 +116,17 @@
           "default": 30,
           "minimum": 1,
           "description": "How long cached PR lookup results stay valid before a scan re-fetches them, in minutes"
+        },
+        "pollard.autoScanOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run Pollard: Scan when a workspace with a Git repository is opened. Off by default — scanning contacts GitHub/GitLab."
+        },
+        "pollard.autoScanIntervalMinutes": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Automatically re-run Pollard: Scan on this interval, in minutes. 0 disables periodic scanning (default). Values below 5 are treated as 5 minutes."
         }
       }
     }

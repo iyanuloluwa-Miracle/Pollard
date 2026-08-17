@@ -8,7 +8,7 @@ export interface BranchAssessment {
   pullRequest: PullRequestInfo | null;
 }
 
-type BucketKind = 'safe' | 'squashMerged' | 'warnings' | 'protected' | 'unscanned';
+export type BucketKind = 'safe' | 'squashMerged' | 'warnings' | 'protected' | 'unscanned';
 
 export type BranchTreeElement =
   | { kind: 'repo'; id: string; repoId: string }
@@ -69,7 +69,7 @@ const STATUS_DISPLAY: Record<
 
 const UNSCANNED_CONTEXT_VALUE = 'UNSCANNED';
 
-function statusToBucket(status: SafetyStatus): BucketKind {
+export function statusToBucket(status: SafetyStatus): BucketKind {
   return STATUS_DISPLAY[status].bucket;
 }
 

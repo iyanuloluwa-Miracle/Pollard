@@ -1,12 +1,38 @@
 import * as vscode from 'vscode';
 import { GitExtension } from './git-api-types';
+import { ParsedRemote, parseGitRemoteUrl } from './remote-url';
 
-/** vscode.git's RefType.Head — see git-api-types.d.ts. */
-const REF_TYPE_HEAD = 0;
+/** vscode.git's RefType — see git-api-types.d.ts. */
+export const REF_TYPE_HEAD = 0;
+export const REF_TYPE_REMOTE_HEAD = 1;
 
 export interface RemoteInfo {
   name: string;
   fetchUrl: string | undefined;
+}
+
+/** 'origin' if present, else the first remote, else undefined. */
+export function pickPrimaryRemoteName(remotes: RemoteInfo[]): string | undefined {
+  return remotes.some((r) => r.name === 'origin') ? 'origin' : remotes[0]?.name;
+}
+
+/** Raw fetchUrl of the primary remote — used verbatim as RepoCache's cache-key input. */
+export function primaryRemoteFetchUrl(remotes: RemoteInfo[]): string | undefined {
+  const primaryName = pickPrimaryRemoteName(remotes);
+  return remotes.find((r) => r.name === primaryName)?.fetchUrl;
+}
+
+/** Parsed primary remote for provider construction; falls back to any other remote that parses. */
+export function resolvePrimaryParsedRemote(remotes: RemoteInfo[]): ParsedRemote | undefined {
+  const primary = primaryRemoteFetchUrl(remotes);
+  const parsed = primary ? parseGitRemoteUrl(primary) : undefined;
+  if (parsed) return parsed;
+
+  for (const r of remotes) {
+    const p = r.fetchUrl ? parseGitRemoteUrl(r.fetchUrl) : undefined;
+    if (p) return p;
+  }
+  return undefined;
 }
 
 export interface RepoInfo {

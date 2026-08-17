@@ -1,3 +1,5 @@
+import type { CancellationToken } from 'vscode';
+
 export interface PullRequestInfo {
   /** PR number (GitHub) or MR IID (GitLab). */
   id: number;
@@ -26,11 +28,17 @@ export interface Provider {
    * Batched PR/MR lookup for many branches in as few round trips as possible.
    * Implementations must not issue one request per branch. Branches with no
    * associated PR/MR are absent from the returned map, not present with [].
+   * If `token` is cancelled, implementations check it between network calls
+   * (never aborting one already in flight) and return whatever's accumulated
+   * so far rather than throwing.
    */
-  getPullRequestsForBranches(branches: string[]): Promise<Map<string, PullRequestInfo[]>>;
+  getPullRequestsForBranches(
+    branches: string[],
+    token?: CancellationToken
+  ): Promise<Map<string, PullRequestInfo[]>>;
 
   /** Whether a single branch currently exists on the remote. */
-  branchExistsOnRemote(branch: string): Promise<boolean>;
+  branchExistsOnRemote(branch: string, token?: CancellationToken): Promise<boolean>;
 
   /** Last-known rate-limit state; does not itself trigger a network call. */
   getRateLimitStatus(): RateLimitStatus;

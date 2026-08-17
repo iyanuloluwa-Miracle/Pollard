@@ -25,18 +25,20 @@ const MAX_PAGES = 10;
 async function fetchMergeRequestsIndex(
   apiBase: string,
   remote: ParsedRemote,
-  token: string,
+  privateToken: string,
   wantedBranches: Set<string>,
-  rateLimiter: RateLimiter
+  rateLimiter: RateLimiter,
+  cancellationToken?: vscode.CancellationToken
 ): Promise<Map<string, GitLabMergeRequest[]>> {
   const index = new Map<string, GitLabMergeRequest[]>();
   const found = new Set<string>();
 
   for (let page = 1; page <= MAX_PAGES; page++) {
+    if (cancellationToken?.isCancellationRequested) break;
     rateLimiter.throwIfLimited();
     const url = mergeRequestsPageUrl(apiBase, remote, page);
     const { data, response } = await fetchJson<GitLabMergeRequest[]>(url, {
-      headers: { 'PRIVATE-TOKEN': token },
+      headers: { 'PRIVATE-TOKEN': privateToken },
     });
 
     if (response.status === 403 || response.status === 429) {
@@ -71,17 +73,21 @@ export class GitLabProvider implements Provider {
     this.apiBase = `https://${instanceHost ?? 'gitlab.com'}/api/v4`;
   }
 
-  async getPullRequestsForBranches(branches: string[]): Promise<Map<string, PullRequestInfo[]>> {
+  async getPullRequestsForBranches(
+    branches: string[],
+    token?: vscode.CancellationToken
+  ): Promise<Map<string, PullRequestInfo[]>> {
     this.rateLimiter.throwIfLimited();
-    const token = await getGitlabToken(this.context);
-    if (!token) throw new AuthRequiredError('gitlab');
+    const privateToken = await getGitlabToken(this.context);
+    if (!privateToken) throw new AuthRequiredError('gitlab');
 
     const index = await fetchMergeRequestsIndex(
       this.apiBase,
       this.remote,
-      token,
+      privateToken,
       new Set(branches),
-      this.rateLimiter
+      this.rateLimiter,
+      token
     );
 
     const out = new Map<string, PullRequestInfo[]>();
@@ -92,13 +98,14 @@ export class GitLabProvider implements Provider {
     return out;
   }
 
-  async branchExistsOnRemote(branch: string): Promise<boolean> {
+  async branchExistsOnRemote(branch: string, token?: vscode.CancellationToken): Promise<boolean> {
     this.rateLimiter.throwIfLimited();
-    const token = await getGitlabToken(this.context);
-    if (!token) throw new AuthRequiredError('gitlab');
+    if (token?.isCancellationRequested) return false;
+    const privateToken = await getGitlabToken(this.context);
+    if (!privateToken) throw new AuthRequiredError('gitlab');
 
     const { response } = await fetchJson(branchUrl(this.apiBase, this.remote, branch), {
-      headers: { 'PRIVATE-TOKEN': token },
+      headers: { 'PRIVATE-TOKEN': privateToken },
     });
     if (response.status === 403 || response.status === 429) {
       this.rateLimiter.noteThrottled(response.headers.get('retry-after'));

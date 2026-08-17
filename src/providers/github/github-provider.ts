@@ -1,3 +1,4 @@
+import type { CancellationToken } from 'vscode';
 import { ParsedRemote } from '../../git/remote-url';
 import { AuthRequiredError } from '../errors';
 import { fetchJson } from '../http';
@@ -33,13 +34,17 @@ export class GitHubProvider implements Provider {
       : 'https://api.github.com/graphql';
   }
 
-  async getPullRequestsForBranches(branches: string[]): Promise<Map<string, PullRequestInfo[]>> {
+  async getPullRequestsForBranches(
+    branches: string[],
+    token?: CancellationToken
+  ): Promise<Map<string, PullRequestInfo[]>> {
     this.rateLimiter.throwIfLimited();
     const session = await getGithubSession(false);
     if (!session) throw new AuthRequiredError('github');
 
     const result = new Map<string, PullRequestInfo[]>();
     for (const chunk of chunkBranches(branches)) {
+      if (token?.isCancellationRequested) break;
       const { query, variables, aliasToBranch } = buildBatchRefsQuery(
         this.remote.owner,
         this.remote.repo,
@@ -62,8 +67,9 @@ export class GitHubProvider implements Provider {
     return result;
   }
 
-  async branchExistsOnRemote(branch: string): Promise<boolean> {
+  async branchExistsOnRemote(branch: string, token?: CancellationToken): Promise<boolean> {
     this.rateLimiter.throwIfLimited();
+    if (token?.isCancellationRequested) return false;
     const session = await getGithubSession(false);
     if (!session) throw new AuthRequiredError('github');
 

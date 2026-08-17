@@ -31,10 +31,23 @@ export interface Commit {
   readonly commitDate?: Date;
 }
 
+export interface UpstreamRef {
+  readonly remote: string;
+  readonly name: string;
+  readonly commit?: string;
+}
+
+export interface Branch extends Ref {
+  readonly upstream?: UpstreamRef;
+}
+
 export interface Repository {
   readonly rootUri: { readonly fsPath: string };
   readonly state: RepositoryState;
   getCommit(ref: string): Promise<Commit>;
+  getBranch(name: string): Promise<Branch>;
+  /** Rejects if no common ancestor exists (e.g. shallow clone) — always wrap in try/catch, never null-check. */
+  getMergeBase(ref1: string, ref2: string): Promise<string>;
 }
 
 export interface API {
