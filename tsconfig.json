@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "exclude": ["node_modules", ".vscode-test", "dist", "out"]
+  "exclude": ["node_modules", ".vscode-test", "dist", "out", "vitest.config.mts"]
 }
