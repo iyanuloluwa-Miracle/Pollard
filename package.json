@@ -1,0 +1,75 @@
+{
+  "name": "pollard",
+  "displayName": "Pollard",
+  "description": "Find, verify and safely delete dead Git branches.",
+  "version": "0.0.1",
+  "publisher": "pollard-dev",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:pollard.branches"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Pollard runs git commands in the workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Pollard requires a local git repository."
+    }
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pollard",
+          "title": "Pollard",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "pollard": [
+        {
+          "id": "pollard.branches",
+          "name": "Branches"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "pollard.scan", "title": "Pollard: Scan" },
+      { "command": "pollard.clean", "title": "Pollard: Clean" },
+      { "command": "pollard.restore", "title": "Pollard: Restore" },
+      { "command": "pollard.refresh", "title": "Pollard: Refresh" }
+    ]
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "format": "prettier --write .",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "@types/vscode": "1.85.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}
