@@ -73,6 +73,13 @@ export function statusToBucket(status: SafetyStatus): BucketKind {
   return STATUS_DISPLAY[status].bucket;
 }
 
+export function statusIconAndColor(status: SafetyStatus): {
+  icon: string;
+  color: string | undefined;
+} {
+  return STATUS_DISPLAY[status];
+}
+
 const RELATIVE_TIME_FORMAT = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 365 * 24 * 60 * 60 * 1000],
@@ -163,6 +170,33 @@ export class BranchTreeProvider
     } else {
       this._onDidChangeTreeData.fire(undefined);
     }
+  }
+
+  /**
+   * Single-entry add/update/remove — undefined removes. Used for instant
+   * feedback right after a delete/restore without waiting for the debounced
+   * FS-watcher refresh, and without clobbering the rest of that repo's map
+   * (unlike updateAssessments's replace-all semantics).
+   */
+  setAssessment(
+    repoId: string,
+    branchName: string,
+    assessment: BranchAssessment | undefined
+  ): void {
+    let map = this.assessmentsByRepo.get(repoId);
+    if (!map) {
+      if (assessment === undefined) return;
+      map = new Map();
+      this.assessmentsByRepo.set(repoId, map);
+    }
+    if (assessment === undefined) map.delete(branchName);
+    else map.set(branchName, assessment);
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /** Read-only snapshot of one repo's assessments, or undefined if unscanned. */
+  getAssessments(repoId: string): Map<string, BranchAssessment> | undefined {
+    return this.assessmentsByRepo.get(repoId);
   }
 
   getTreeItem(element: BranchTreeElement): vscode.TreeItem | Thenable<vscode.TreeItem> {

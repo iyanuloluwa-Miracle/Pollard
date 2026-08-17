@@ -96,8 +96,28 @@
       {
         "command": "pollard.clearCache",
         "title": "Pollard: Clear Cache"
+      },
+      {
+        "command": "pollard.deleteBranch",
+        "title": "Pollard: Delete Branch",
+        "icon": "$(trash)"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pollard.deleteBranch",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pollard.deleteBranch",
+          "when": "view == pollard.branches && viewItem =~ /^(SAFE_MERGED|SAFE_SQUASH_MERGED|WARNING_CLOSED_PR|WARNING_UNMERGED|WARNING_NO_PR|UNKNOWN)$/",
+          "group": "inline"
+        }
+      ]
+    },
     "configuration": {
       "title": "Pollard",
       "properties": {

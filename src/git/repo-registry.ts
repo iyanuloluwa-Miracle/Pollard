@@ -22,6 +22,7 @@ const NO_DATE = Symbol('no-date');
 interface RepoEntry {
   repository: Repository;
   watcher: vscode.Disposable | undefined;
+  gitDirs: { gitDir: string; commonDir: string } | undefined;
   commitDateCache: Map<string, Date | typeof NO_DATE | Promise<Date | undefined>>;
   /** Keyed by [shaA,shaB].sort().join('|') — merge-base is symmetric for a two-ref lookup. */
   mergeBaseCache: Map<string, Promise<string | undefined>>;
@@ -231,24 +232,46 @@ export class RepoRegistry implements vscode.Disposable {
     }
   }
 
+  /** Worktree-aware git/common dirs for a repo, or undefined if unresolved. Same resolution the ref watcher uses, exposed for direct ref file I/O (e.g. clean's backup mechanism) so callers never duplicate resolveGitDirs. */
+  getGitDirs(repoId: string): { gitDir: string; commonDir: string } | undefined {
+    return this.entries.get(repoId)?.gitDirs;
+  }
+
+  /** Creates a local branch. Rejects on failure (e.g. name collision) — callers must catch per-branch, unlike the informational lookups above which swallow errors. */
+  async createBranch(repoId: string, name: string, checkout: boolean, ref?: string): Promise<void> {
+    const entry = this.entries.get(repoId);
+    if (!entry) throw new Error(`Unknown repo: ${repoId}`);
+    await entry.repository.createBranch(name, checkout, ref);
+  }
+
+  /** Force-deletes a local branch (force: true === `git branch -D`). Rejects on failure — callers must catch per-branch. */
+  async deleteBranch(repoId: string, name: string, force: boolean): Promise<void> {
+    const entry = this.entries.get(repoId);
+    if (!entry) throw new Error(`Unknown repo: ${repoId}`);
+    await entry.repository.deleteBranch(name, force);
+  }
+
   private async addRepo(repository: Repository): Promise<void> {
     const repoId = repository.rootUri.fsPath;
     let watcher: vscode.Disposable | undefined;
+    let gitDirs: { gitDir: string; commonDir: string } | undefined;
     try {
-      const dirs = await resolveGitDirs(repoId);
-      if (dirs) {
-        watcher = watchRepoRefs(dirs.gitDir, dirs.commonDir, () =>
+      gitDirs = await resolveGitDirs(repoId);
+      if (gitDirs) {
+        watcher = watchRepoRefs(gitDirs.gitDir, gitDirs.commonDir, () =>
           this._onDidChangeRefs.fire(repoId)
         );
       }
     } catch {
       // Degrade gracefully: no auto-refresh for this repo, manual refresh still works.
       watcher = undefined;
+      gitDirs = undefined;
     }
 
     this.entries.set(repoId, {
       repository,
       watcher,
+      gitDirs,
       commitDateCache: new Map(),
       mergeBaseCache: new Map(),
     });

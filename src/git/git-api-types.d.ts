@@ -48,6 +48,9 @@ export interface Repository {
   getBranch(name: string): Promise<Branch>;
   /** Rejects if no common ancestor exists (e.g. shallow clone) — always wrap in try/catch, never null-check. */
   getMergeBase(ref1: string, ref2: string): Promise<string>;
+  createBranch(name: string, checkout: boolean, ref?: string): Promise<void>;
+  /** force: true === `git branch -D`. */
+  deleteBranch(name: string, force?: boolean): Promise<void>;
 }
 
 export interface API {
