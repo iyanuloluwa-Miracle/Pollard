@@ -26,6 +26,8 @@ jobs:
 
       - run: npm run check-types
 
+      - run: npm run check-contributions
+
       - run: npm test
 
       - name: Run vscode-test layers (Linux, headless via xvfb)
