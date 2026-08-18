@@ -257,7 +257,7 @@ async function restoreDeleted(
     );
     if (choice === 'Show Log') deps.logChannel.show();
   } else {
-    vscode.window.showInformationMessage(summary);
+    void vscode.window.showInformationMessage(summary);
   }
 }
 
@@ -315,11 +315,24 @@ async function runCleanFlow(
     const confirmed = await confirmDeletion(repo, candidates);
     if (!confirmed) return;
 
-    // STEP 4 — backup-then-delete, sequential per branch.
+    // STEP 4 — backup-then-delete, sequential per branch. Cancellable: a
+    // large confirmed batch can be stopped partway through.
     const results: BranchDeleteResult[] = [];
-    for (const c of candidates) {
-      results.push(await deleteWithBackup(deps, repo.id, c.branchName, c.sha, command));
-    }
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Pollard: Deleting branches in ${repo.label}`,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        const increment = 100 / candidates.length;
+        for (const c of candidates) {
+          if (token.isCancellationRequested) break;
+          results.push(await deleteWithBackup(deps, repo.id, c.branchName, c.sha, command));
+          progress.report({ increment, message: c.branchName });
+        }
+      }
+    );
     for (const r of results) {
       if (isDeleted(r)) deps.branchTreeProvider.setAssessment(r.repoId, r.branchName, undefined);
     }
@@ -344,13 +357,13 @@ export async function runClean(deps: CleanDeps): Promise<void> {
 
   const assessments = deps.branchTreeProvider.getAssessments(repo.id);
   if (!assessments) {
-    vscode.window.showInformationMessage('Pollard: Run Pollard: Scan first.');
+    void vscode.window.showInformationMessage('Pollard: Run Pollard: Scan first.');
     return;
   }
 
   const candidates = buildEligibleCandidates(repo, assessments);
   if (candidates.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No deletable branches found.');
+    void vscode.window.showInformationMessage('Pollard: No deletable branches found.');
     return;
   }
 
@@ -364,7 +377,7 @@ export async function runClean(deps: CleanDeps): Promise<void> {
   });
   if (!picked) return;
   if (picked.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No branches selected.');
+    void vscode.window.showInformationMessage('Pollard: No branches selected.');
     return;
   }
 

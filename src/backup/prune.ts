@@ -48,7 +48,7 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
 
   const total = perRepo.reduce((n, r) => n + r.stale.length, 0);
   if (total === 0) {
-    vscode.window.showInformationMessage(
+    void vscode.window.showInformationMessage(
       `Pollard: No backups older than ${retentionDays} day(s) found.`
     );
     return;
@@ -66,24 +66,35 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
   );
   if (choice !== 'Delete') return;
 
+  const tasks = perRepo.flatMap(({ repo, stale }) => stale.map((entry) => ({ repo, entry })));
   const results: PruneResult[] = [];
-  for (const { repo, stale } of perRepo) {
-    for (const entry of stale) {
-      try {
-        await deleteBackupRef(deps.registry, repo.id, entry);
-        results.push({ repoId: repo.id, refPath: entry.refPath, ok: true });
-      } catch (err) {
-        const classified = classifyError(err);
-        logAndTrackError(classified, errCtx);
-        results.push({
-          repoId: repo.id,
-          refPath: entry.refPath,
-          ok: false,
-          error: classified.message,
-        });
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Pollard: Pruning backups',
+      cancellable: true,
+    },
+    async (progress, token) => {
+      const increment = 100 / tasks.length;
+      for (const { repo, entry } of tasks) {
+        if (token.isCancellationRequested) break;
+        try {
+          await deleteBackupRef(deps.registry, repo.id, entry);
+          results.push({ repoId: repo.id, refPath: entry.refPath, ok: true });
+        } catch (err) {
+          const classified = classifyError(err);
+          logAndTrackError(classified, errCtx);
+          results.push({
+            repoId: repo.id,
+            refPath: entry.refPath,
+            ok: false,
+            error: classified.message,
+          });
+        }
+        progress.report({ increment, message: entry.refPath });
       }
     }
-  }
+  );
 
   writePruneResultsToLog(deps.logChannel, results);
   const failed = results.filter((r) => !r.ok).length;
@@ -92,6 +103,6 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
     const c = await vscode.window.showWarningMessage(`${summary} ${failed} failed.`, 'Show Log');
     if (c === 'Show Log') deps.logChannel.show();
   } else {
-    vscode.window.showInformationMessage(summary);
+    void vscode.window.showInformationMessage(summary);
   }
 }

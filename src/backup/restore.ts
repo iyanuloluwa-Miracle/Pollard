@@ -74,7 +74,7 @@ export async function runRestore(deps: CleanDeps): Promise<void> {
 
   const entries = await listBackupRefs(deps.registry, repo.id, deps.logChannel);
   if (entries.length === 0) {
-    vscode.window.showInformationMessage(`Pollard: No backups found for ${repo.label}.`);
+    void vscode.window.showInformationMessage(`Pollard: No backups found for ${repo.label}.`);
     return;
   }
 
@@ -95,7 +95,7 @@ export async function runRestore(deps: CleanDeps): Promise<void> {
 
   try {
     await restoreBranchFromBackup(deps.registry, repo.id, finalName, picked.entry.refPath);
-    vscode.window.showInformationMessage(`Pollard: Restored "${finalName}".`);
+    void vscode.window.showInformationMessage(`Pollard: Restored "${finalName}".`);
   } catch (err) {
     const classified = classifyError(err);
     logAndTrackError(classified, errCtx);
