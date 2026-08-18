@@ -139,6 +139,10 @@
       {
         "command": "pollard.pruneBackups",
         "title": "Pollard: Prune Backups"
+      },
+      {
+        "command": "pollard.doctor",
+        "title": "Pollard: Run Diagnostics"
       }
     ],
     "menus": {

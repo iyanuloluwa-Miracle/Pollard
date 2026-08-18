@@ -4,6 +4,7 @@ import { getGithubSession } from '../providers';
 import { BranchTreeElement } from '../views';
 import { CleanDeps, runClean, runCleanSingleBranch } from './clean';
 import { runClearCache } from './clearCache';
+import { runDoctor } from './doctor';
 import { runPruneBackups } from './pruneBackups';
 import { runRefresh } from './refresh';
 import { runRestore } from './restore';
@@ -30,6 +31,7 @@ export function registerCommands(
     vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
     vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context)),
     vscode.commands.registerCommand('pollard.clearCache', () => runClearCache(context)),
+    vscode.commands.registerCommand('pollard.doctor', () => runDoctor(scanDeps)),
     vscode.commands.registerCommand('pollard.deleteBranch', (element: BranchTreeElement) => {
       if (element.kind !== 'branch') return;
       return runCleanSingleBranch(cleanDeps, element);

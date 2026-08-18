@@ -49,6 +49,11 @@ export class RepoCache {
     this.ttlMs = ttlMs ?? getConfiguredTtlMs();
   }
 
+  /** Filesystem path of this repo's cache file. Used by pollard.doctor. */
+  getFilePath(): string {
+    return this.fileUri.fsPath;
+  }
+
   /** Returns cached PR results for a branch, or undefined if missing/expired. Never touches the network. */
   async getPullRequests(branch: string): Promise<PullRequestInfo[] | undefined> {
     const data = await this.read();

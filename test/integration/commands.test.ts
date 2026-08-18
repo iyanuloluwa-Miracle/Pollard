@@ -13,6 +13,7 @@ const EXPECTED_COMMAND_IDS = [
   'pollard.connectGitlab',
   'pollard.clearCache',
   'pollard.deleteBranch',
+  'pollard.doctor',
 ];
 
 describe('integration: command registration', () => {
