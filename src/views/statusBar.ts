@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { RepoRegistry } from '../workspace/repositories';
-import { RepoBucketCounts } from '../safety/engine';
+import { RepoRegistry } from '../workspace';
+import { RepoBucketCounts } from '../safety';
 
 /**
  * $(git-branch) N in the status bar, where N is deletion candidates only

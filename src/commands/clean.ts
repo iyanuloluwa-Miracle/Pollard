@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import { writeBackupRef, restoreBranchFromBackup } from '../git/backup';
+import { writeBackupRef, restoreBranchFromBackup } from '../git';
 import { getMinimumScoreForBulkDelete } from '../config';
 import { classifyError, logAndTrackError, PollardCommandId } from '../errors';
 import { PollardLogger } from '../logger';
-import { pickRepo } from '../ui/quickPick';
-import { confirmDeletion } from '../ui/confirm';
-import { RepoHandle } from '../workspace/repositories';
-import { tallyBucketCounts } from '../safety/engine';
-import { statusIconAndColor } from '../safety/status';
-import { BranchAssessment, SafetyStatus } from '../safety/types';
+import { pickRepo } from '../ui';
+import { confirmDeletion } from '../ui';
+import { RepoHandle } from '../workspace';
+import { tallyBucketCounts } from '../safety';
+import { statusIconAndColor } from '../safety';
+import { BranchAssessment, SafetyStatus } from '../safety';
 import { ScanDeps } from './types';
-import { BranchTreeElement } from '../views/items';
-import { PreviewEntry, clearPreviewContent, generatePreviewId, showCleanPreview } from '../views/previewDocument';
+import { BranchTreeElement } from '../views';
+import { PreviewEntry, clearPreviewContent, generatePreviewId, showCleanPreview } from '../views';
 
 export type CleanDeps = ScanDeps;
 

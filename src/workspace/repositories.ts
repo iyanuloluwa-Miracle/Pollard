@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { Branch, GitExtension, Ref, REF_TYPE_HEAD, RemoteInfo, Repository } from '../git/types';
+import { Branch, GitExtension, Ref, REF_TYPE_HEAD, RemoteInfo, Repository } from '../git';
 
 export interface RepoHandle {
   /** === Repository.rootUri.fsPath. Stable, unique, no separate ID scheme needed. */

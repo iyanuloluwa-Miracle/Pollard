@@ -1,4 +1,4 @@
-import { PullRequestInfo } from '../providers/provider';
+import { PullRequestInfo } from '../providers';
 
 export interface PullRequestFacts {
   /** A PR is only ever open or closed at the VCS level; "merged" only means anything once closed. */

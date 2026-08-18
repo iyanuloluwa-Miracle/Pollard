@@ -1,5 +1,5 @@
-import { pickPrimaryRemoteName } from '../git/branches';
-import { RemoteInfo } from '../git/types';
+import { pickPrimaryRemoteName } from '../git';
+import { RemoteInfo } from '../git';
 
 export interface ParsedRemote {
   host: string;

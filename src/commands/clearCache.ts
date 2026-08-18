@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { clearCache } from '../state/cache';
+import { clearCache } from '../state';
 
 export async function runClearCache(context: vscode.ExtensionContext): Promise<void> {
   await clearCache(context);

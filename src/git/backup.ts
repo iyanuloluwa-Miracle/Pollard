@@ -1,6 +1,6 @@
 import { PollardLogger } from '../logger';
 import { runGit } from './exec';
-import { RepoRegistry } from '../workspace/repositories';
+import { RepoRegistry } from '../workspace';
 
 export const BACKUP_REF_PREFIX = 'refs/pollard/backups/';
 

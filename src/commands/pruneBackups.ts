@@ -3,8 +3,8 @@ import { CleanDeps } from './clean';
 import { getBackupsRetentionDays } from '../config';
 import { classifyError, logAndTrackError } from '../errors';
 import { PollardLogger } from '../logger';
-import { RepoHandle } from '../workspace/repositories';
-import { BackupRefEntry, deleteBackupRef, listBackupRefs } from '../git/backup';
+import { RepoHandle } from '../workspace';
+import { BackupRefEntry, deleteBackupRef, listBackupRefs } from '../git';
 
 interface PruneResult {
   repoId: string;

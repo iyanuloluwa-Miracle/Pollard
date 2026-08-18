@@ -1,10 +1,10 @@
 import { getProtectedBranchPatterns } from '../config';
 import { classifyNotAGitRepo, presentError } from '../errors';
-import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branches';
-import { PullRequestInfo } from '../providers/provider';
-import { primaryRemoteFetchUrl } from '../providers/remoteUrl';
-import { buildRepoAssessments, tallyBucketCounts } from '../safety/engine';
-import { RepoCache } from '../state/cache';
+import { computeLocalBranchFacts, resolveDefaultBranch } from '../git';
+import { PullRequestInfo } from '../providers';
+import { primaryRemoteFetchUrl } from '../providers';
+import { buildRepoAssessments, tallyBucketCounts } from '../safety';
+import { RepoCache } from '../state';
 import { ScanDeps } from './types';
 
 /**

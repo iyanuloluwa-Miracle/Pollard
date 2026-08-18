@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PollardLogger } from './logger';
-import { formatRelativeDate } from './util/relative-time';
+import { formatRelativeDate } from './util';
 
 /**
  * Single classification + presentation pathway for every fallible operation

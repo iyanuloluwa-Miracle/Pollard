@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { Ref, REF_TYPE_REMOTE_HEAD, RemoteInfo } from './types';
 import { computeIsAncestorOfAnotherLocalBranch, computeMergeStatus } from './merge';
-import { matchesAnyPattern } from '../safety/protected';
-import { BranchFacts } from '../safety/types';
-import { mapWithConcurrency } from '../util/concurrency';
-import { RepoHandle, RepoRegistry } from '../workspace/repositories';
+import { matchesAnyPattern } from '../safety';
+import { BranchFacts } from '../safety';
+import { mapWithConcurrency } from '../util';
+import { RepoHandle, RepoRegistry } from '../workspace';
 
 export interface DefaultBranchInfo {
   name: string;

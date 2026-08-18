@@ -1,13 +1,10 @@
 import * as vscode from 'vscode';
-import { registerCommands, runScan } from './commands';
-import { ScanDeps } from './commands/types';
+import { registerCommands, runScan, ScanDeps } from './commands';
 import { getAutoScanIntervalMinutes, getAutoScanOnStartup } from './config';
 import { PollardLogger } from './logger';
 import { PollardTelemetryReporter } from './telemetry';
-import { BranchTreeProvider } from './views/branchTree';
-import { registerCleanPreviewProvider } from './views/previewDocument';
-import { StatusBarController } from './views/statusBar';
-import { RepoRegistry } from './workspace/repositories';
+import { BranchTreeProvider, registerCleanPreviewProvider, StatusBarController } from './views';
+import { RepoRegistry } from './workspace';
 
 const MIN_AUTO_SCAN_INTERVAL_MINUTES = 5;
 

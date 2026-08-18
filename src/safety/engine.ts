@@ -1,4 +1,4 @@
-import { PullRequestInfo } from '../providers/provider';
+import { PullRequestInfo } from '../providers';
 import { statusToBucket, BucketKind } from './status';
 import { BranchAssessment, BranchFacts, PullRequestFacts, SafetyAssessment, SafetyStatus } from './types';
 

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { RepoRegistry } from '../workspace/repositories';
-import { statusIconAndColor, statusToBucket, UNSCANNED_CONTEXT_VALUE, BucketKind } from '../safety/status';
-import { BranchAssessment, SafetyStatus } from '../safety/types';
-import { formatRelativeDate } from '../util/relative-time';
+import { RepoRegistry } from '../workspace';
+import { statusIconAndColor, statusToBucket, UNSCANNED_CONTEXT_VALUE, BucketKind } from '../safety';
+import { BranchAssessment, SafetyStatus } from '../safety';
+import { formatRelativeDate } from '../util';
 import {
   BranchTreeElement,
   makeBannerElement,

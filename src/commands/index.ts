@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { connectGitlab } from '../providers/gitlab/auth';
-import { getGithubSession } from '../providers/github/auth';
-import { BranchTreeElement } from '../views/items';
+import { connectGitlab } from '../providers';
+import { getGithubSession } from '../providers';
+import { BranchTreeElement } from '../views';
 import { CleanDeps, runClean, runCleanSingleBranch } from './clean';
 import { runClearCache } from './clearCache';
 import { runPruneBackups } from './pruneBackups';
@@ -11,6 +11,8 @@ import { runScan } from './scan';
 import { ScanDeps } from './types';
 
 export { runScan } from './scan';
+export { CleanDeps } from './clean';
+export { ScanDeps } from './types';
 
 /** Registers every pollard.* command. Returns the disposables for the caller to push into context.subscriptions. */
 export function registerCommands(

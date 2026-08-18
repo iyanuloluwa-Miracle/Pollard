@@ -1,5 +1,5 @@
-import { RepoRegistry } from '../workspace/repositories';
-import { MergeStatus } from '../safety/types';
+import { RepoRegistry } from '../workspace';
+import { MergeStatus } from '../safety';
 
 /** Bounds how many branches' worth of git subprocess calls (via the vscode.git extension's merge-base/branch lookups) are in flight at once — a 200-branch repo must not fire 200 at once, nor crawl fully serially. */
 const ANCESTOR_CHECK_MAX_BRANCHES = 60;

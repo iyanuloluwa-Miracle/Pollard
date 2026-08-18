@@ -1,4 +1,4 @@
-import { PullRequestInfo } from '../providers/provider';
+import { PullRequestInfo } from '../providers';
 
 const CURRENT_SCHEMA_VERSION = 1;
 

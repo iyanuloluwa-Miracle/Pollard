@@ -43,3 +43,16 @@ export async function runGit(
     throw new Error(`git ${args[0]} failed: ${e.stderr?.trim() || e.message}`, { cause: err });
   }
 }
+
+/** Resolved git version string (e.g. "git version 2.43.0"), or undefined if git isn't on PATH. No repo context needed, unlike runGit. Used by pollard.doctor. */
+export async function getGitVersion(): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync('git', ['--version'], {
+      encoding: 'utf8',
+      timeout: GIT_TIMEOUT_MS,
+    });
+    return stdout.trim();
+  } catch {
+    return undefined;
+  }
+}

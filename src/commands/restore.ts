@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { CleanDeps } from './clean';
 import { classifyError, logAndTrackError } from '../errors';
-import { RepoHandle } from '../workspace/repositories';
-import { pickRepo } from '../ui/quickPick';
-import { confirmRestoreAsRenamed } from '../ui/confirm';
-import { BackupRefEntry, listBackupRefs, restoreBranchFromBackup } from '../git/backup';
+import { RepoHandle } from '../workspace';
+import { pickRepo } from '../ui';
+import { confirmRestoreAsRenamed } from '../ui';
+import { BackupRefEntry, listBackupRefs, restoreBranchFromBackup } from '../git';
 
 function formatDeletionTime(timestampMs: number): string {
   return new Date(timestampMs).toLocaleString(undefined, {

@@ -1,4 +1,4 @@
-import { BucketKind } from '../safety/status';
+import { BucketKind } from '../safety';
 
 export type BranchTreeElement =
   | { kind: 'repo'; id: string; repoId: string }

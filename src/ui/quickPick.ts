@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { classifyNotAGitRepo, PollardCommandId, presentError, TelemetryReporter } from '../errors';
 import { PollardLogger } from '../logger';
-import { RepoHandle, RepoRegistry } from '../workspace/repositories';
+import { RepoHandle, RepoRegistry } from '../workspace';
 
 export interface PickRepoErrorContext {
   logChannel: PollardLogger;

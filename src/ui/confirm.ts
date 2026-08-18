@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SafetyStatus } from '../safety/types';
+import { SafetyStatus } from '../safety';
 
 export async function confirmDeletion(
   repoLabel: string,

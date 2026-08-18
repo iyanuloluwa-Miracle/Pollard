@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import * as vscode from 'vscode';
 import { getCacheTtlMinutes } from '../config';
 import { PollardLogger } from '../logger';
-import { PullRequestInfo } from '../providers/provider';
+import { PullRequestInfo } from '../providers';
 import { CachedPullRequestEntry, CacheFile, emptyCacheFile, migrate } from './schema';
 
 /**

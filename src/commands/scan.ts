@@ -8,14 +8,14 @@ import {
   classifyNotSignedIn,
   presentError,
 } from '../errors';
-import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branches';
-import { getGithubSession } from '../providers/github/auth';
-import { getGitlabToken } from '../providers/gitlab/auth';
-import { createProvider, PullRequestInfo } from '../providers/provider';
-import { primaryRemoteFetchUrl, resolvePrimaryParsedRemote } from '../providers/remoteUrl';
-import { buildRepoAssessments, tallyBucketCounts } from '../safety/engine';
-import { BranchFacts } from '../safety/types';
-import { RepoCache } from '../state/cache';
+import { computeLocalBranchFacts, resolveDefaultBranch } from '../git';
+import { getGithubSession } from '../providers';
+import { getGitlabToken } from '../providers';
+import { createProvider, PullRequestInfo } from '../providers';
+import { primaryRemoteFetchUrl, resolvePrimaryParsedRemote } from '../providers';
+import { buildRepoAssessments, tallyBucketCounts } from '../safety';
+import { BranchFacts } from '../safety';
+import { RepoCache } from '../state';
 import { ScanDeps } from './types';
 
 let scanInFlight: Promise<void> | undefined;

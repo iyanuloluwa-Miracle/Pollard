@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import * as vscode from 'vscode';
-import { SafetyAssessment } from '../safety/types';
+import { SafetyAssessment } from '../safety';
 
 export const PREVIEW_SCHEME = 'pollard-preview';
 
