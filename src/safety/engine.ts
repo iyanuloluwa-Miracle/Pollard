@@ -1,46 +1,6 @@
-export interface PullRequestFacts {
-  /** A PR is only ever open or closed at the VCS level; "merged" only means anything once closed. */
-  state: 'open' | 'closed';
-  merged: boolean;
-}
-
-/**
- * 'unknown' = indeterminate, e.g. a shallow clone where merge-base can't be
- * computed, or the default branch ref isn't resolvable locally.
- */
-export type MergeStatus = 'merged' | 'not_merged' | 'unknown';
-
-export interface BranchFacts {
-  isCurrent: boolean;
-  isProtected: boolean;
-  /** Is this branch's tip reachable from the default branch's tip? */
-  mergeStatus: MergeStatus;
-  /** Does some remote currently have a ref reaching this branch's tip (i.e. is the content backed up off-machine)? */
-  isPushed: boolean;
-  /** Does a branch of this name currently exist on some remote? Can diverge from isPushed after a force-push/rebase. Informational only. */
-  existsOnRemote: boolean;
-  /** Was there a configured upstream that has since disappeared ("gone")? Informational only — never affects score. */
-  upstreamIsGone: boolean;
-  /** Is this branch's tip also reachable from some other local branch? Informational only — never affects score, since a second local ref is not a safe backstop. */
-  isAncestorOfAnotherLocalBranch: boolean;
-  pullRequest: PullRequestFacts | null;
-}
-
-export type SafetyStatus =
-  | 'SAFE_MERGED'
-  | 'SAFE_SQUASH_MERGED'
-  | 'WARNING_CLOSED_PR'
-  | 'WARNING_UNMERGED'
-  | 'WARNING_NO_PR'
-  | 'PROTECTED'
-  | 'CURRENT'
-  | 'UNKNOWN';
-
-export interface SafetyAssessment {
-  status: SafetyStatus;
-  score: number;
-  reasons: string[];
-}
+import { PullRequestInfo } from '../providers/provider';
+import { statusToBucket, BucketKind } from './status';
+import { BranchAssessment, BranchFacts, PullRequestFacts, SafetyAssessment, SafetyStatus } from './types';
 
 const LOCAL_ONLY_CAP_SCORE = 35;
 
@@ -121,4 +81,62 @@ function applyLocalOnlyCap(facts: BranchFacts, base: SafetyAssessment): SafetyAs
     };
   }
   return base;
+}
+
+export interface RepoBucketCounts {
+  safe: number;
+  squashMerged: number;
+  warnings: number;
+  protectedCount: number;
+  unscanned: number;
+}
+
+const BUCKET_FIELD: Record<BucketKind, keyof RepoBucketCounts> = {
+  safe: 'safe',
+  squashMerged: 'squashMerged',
+  warnings: 'warnings',
+  protected: 'protectedCount',
+  unscanned: 'unscanned',
+};
+
+function emptyBucketCounts(): RepoBucketCounts {
+  return { safe: 0, squashMerged: 0, warnings: 0, protectedCount: 0, unscanned: 0 };
+}
+
+/** Prefer merged > open > closed; tie-break on highest id (most recent). */
+export function pickRepresentativePullRequest(prs: PullRequestInfo[]): PullRequestInfo | undefined {
+  if (prs.length === 0) return undefined;
+  const rank = (pr: PullRequestInfo) => (pr.merged ? 2 : pr.state === 'open' ? 1 : 0);
+  return [...prs].sort((a, b) => rank(b) - rank(a) || b.id - a.id)[0];
+}
+
+function toPullRequestFacts(pr: PullRequestInfo | undefined): PullRequestFacts | null {
+  if (!pr) return null;
+  return { state: pr.state === 'open' ? 'open' : 'closed', merged: pr.merged };
+}
+
+/** The only place a full BranchFacts is assembled from parts — shared by scan's "assessing" phase and refresh. */
+export function buildRepoAssessments(
+  localFacts: Map<string, Omit<BranchFacts, 'pullRequest'>>,
+  prsByBranch: Map<string, PullRequestInfo[]>
+): Map<string, BranchAssessment> {
+  const out = new Map<string, BranchAssessment>();
+  for (const [branchName, partial] of localFacts) {
+    const prs = prsByBranch.get(branchName) ?? [];
+    const representative = pickRepresentativePullRequest(prs);
+    const facts: BranchFacts = { ...partial, pullRequest: toPullRequestFacts(representative) };
+    out.set(branchName, {
+      assessment: assessBranchSafety(facts),
+      pullRequest: representative ?? null,
+    });
+  }
+  return out;
+}
+
+export function tallyBucketCounts(assessments: Map<string, BranchAssessment>): RepoBucketCounts {
+  const counts = emptyBucketCounts();
+  for (const { assessment } of assessments.values()) {
+    counts[BUCKET_FIELD[statusToBucket(assessment.status)]]++;
+  }
+  return counts;
 }

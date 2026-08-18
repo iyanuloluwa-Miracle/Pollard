@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BranchFacts, assessBranchSafety } from './engine';
+import { assessBranchSafety } from './engine';
+import { BranchFacts } from './types';
 
 function facts(overrides: Partial<BranchFacts>): BranchFacts {
   return {

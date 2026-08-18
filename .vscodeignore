@@ -11,7 +11,7 @@ out/**
 eslint.config.mjs
 tsconfig.json
 vitest.config.mts
-esbuild.js
+scripts/**
 .prettierrc.json
 .prettierignore
 node_modules/**

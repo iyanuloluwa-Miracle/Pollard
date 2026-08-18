@@ -240,12 +240,13 @@
     }
   },
   "scripts": {
-    "compile": "node esbuild.js",
-    "watch": "node esbuild.js --watch",
-    "package": "node esbuild.js --production",
+    "compile": "node scripts/esbuild.mjs",
+    "watch": "node scripts/esbuild.mjs --watch",
+    "package": "node scripts/esbuild.mjs --production",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src test",
-    "check": "npm run lint && npm run check-types",
+    "lint": "eslint src test scripts",
+    "check-contributions": "node scripts/check-contributions.mjs",
+    "check": "npm run lint && npm run check-types && npm run check-contributions",
     "format": "prettier --write .",
     "vscode:prepublish": "npm run package",
     "test": "vitest run",

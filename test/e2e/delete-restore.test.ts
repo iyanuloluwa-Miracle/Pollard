@@ -4,8 +4,8 @@ import {
   listBackupRefs,
   restoreBranchFromBackup,
   writeBackupRef,
-} from '../../src/backup/backupRefs';
-import { RepoRegistry } from '../../src/git/repo-registry';
+} from '../../src/git/backup';
+import { RepoRegistry } from '../../src/workspace/repositories';
 
 describe('e2e: delete a branch, restore it from its backup ref', () => {
   let registry: RepoRegistry;

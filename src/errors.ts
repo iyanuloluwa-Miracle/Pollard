@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { PollardLogger } from './logger';
 import { formatRelativeDate } from './util/relative-time';
 
 /**
@@ -55,7 +56,7 @@ export interface TelemetryReporter {
 }
 
 export interface PresentErrorContext {
-  logChannel: vscode.LogOutputChannel;
+  logChannel: PollardLogger;
   telemetry: TelemetryReporter;
   command: PollardCommandId;
 }
@@ -244,7 +245,7 @@ export function classifyNotSignedIn(
 // ---------------------------------------------------------------------------
 
 function logClassifiedError(
-  logChannel: vscode.LogOutputChannel,
+  logChannel: PollardLogger,
   classified: ClassifiedError
 ): void {
   const line = `[${classified.category}] ${classified.message}`;

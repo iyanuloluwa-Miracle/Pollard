@@ -3,7 +3,7 @@ import {
   DEFAULT_PROTECTED_BRANCH_PATTERNS,
   matchesAnyPattern,
   resolveProtectedBranchPatterns,
-} from './git/protected-branches';
+} from './safety/protected';
 
 /**
  * The single place that reads vscode.workspace.getConfiguration('pollard')
