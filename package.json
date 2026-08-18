@@ -4,12 +4,46 @@
   "description": "Find, verify and safely delete dead Git branches.",
   "version": "0.0.1",
   "publisher": "pollard-dev",
-  "private": true,
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iyanuloluwa-Miracle/Pollard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iyanuloluwa-Miracle/Pollard/issues"
+  },
+  "homepage": "https://github.com/iyanuloluwa-Miracle/Pollard#readme",
+  "galleryBanner": {
+    "color": "#1B2333",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://github.com/iyanuloluwa-Miracle/Pollard/actions/workflows/ci.yml/badge.svg",
+      "href": "https://github.com/iyanuloluwa-Miracle/Pollard/actions/workflows/ci.yml",
+      "description": "CI status"
+    },
+    {
+      "url": "https://img.shields.io/badge/license-MIT-blue.svg",
+      "href": "https://github.com/iyanuloluwa-Miracle/Pollard/blob/main/LICENSE",
+      "description": "License: MIT"
+    }
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "branches",
+    "cleanup",
+    "github",
+    "gitlab",
+    "pull request",
+    "merge request"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -229,9 +263,11 @@
     "@types/vscode": "1.85.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.2",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
+    "ovsx": "^1.1.1",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.67.0",
