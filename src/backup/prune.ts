@@ -36,6 +36,7 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
   const retentionDays = getBackupsRetentionDays();
   const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
+  await deps.registry.whenReady();
   const repos = deps.registry.repos;
   const perRepo: { repo: RepoHandle; stale: BackupRefEntry[] }[] = [];
   for (const repo of repos) {

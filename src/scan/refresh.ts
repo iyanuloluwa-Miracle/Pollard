@@ -21,6 +21,7 @@ export async function runRefresh({
   logChannel,
   telemetry,
 }: ScanDeps): Promise<void> {
+  await registry.whenReady();
   const repos = registry.repos;
   if (repos.length === 0) {
     presentError(classifyNotAGitRepo(), { logChannel, telemetry, command: 'pollard.refresh' });

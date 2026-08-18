@@ -3,6 +3,7 @@ import { REF_TYPE_REMOTE_HEAD, pickPrimaryRemoteName } from './git-extension';
 import { matchesAnyPattern } from './protected-branches';
 import { RepoHandle, RepoRegistry } from './repo-registry';
 import { BranchFacts, MergeStatus } from '../safety/engine';
+import { mapWithConcurrency } from '../util/concurrency';
 
 export interface DefaultBranchInfo {
   name: string;
@@ -10,6 +11,8 @@ export interface DefaultBranchInfo {
 }
 
 const ANCESTOR_CHECK_MAX_BRANCHES = 60;
+/** Bounds how many branches' worth of git subprocess calls (via the vscode.git extension's merge-base/branch lookups) are in flight at once — a 200-branch repo must not fire 200 at once, nor crawl fully serially. */
+const BRANCH_FACTS_CONCURRENCY = 4;
 
 function stripRemotePrefix(ref: Ref): string | undefined {
   if (!ref.name) return undefined;
@@ -153,33 +156,39 @@ export async function computeLocalBranchFacts(
   const allRefs = registry.getRefs(repo.id) ?? [];
   const remoteRefs = allRefs.filter((r) => r.type === REF_TYPE_REMOTE_HEAD);
 
-  const result = new Map<string, Omit<BranchFacts, 'pullRequest'>>();
-  for (const branch of repo.branches) {
-    const [mergeStatus, isPushed, upstreamIsGone, isAncestorOfAnotherLocalBranch] =
-      await Promise.all([
-        computeMergeStatus(registry, repo.id, branch.sha, defaultBranch?.sha),
-        computeIsPushed(registry, repo.id, branch.name, branch.sha, remoteRefs),
-        computeUpstreamIsGone(registry, repo.id, branch.name, remoteRefs),
-        computeIsAncestorOfAnotherLocalBranch(
-          registry,
-          repo.id,
-          branch.name,
-          branch.sha,
-          repo.branches
-        ),
-      ]);
+  const entries = await mapWithConcurrency(
+    repo.branches,
+    BRANCH_FACTS_CONCURRENCY,
+    async (branch): Promise<[string, Omit<BranchFacts, 'pullRequest'>]> => {
+      const [mergeStatus, isPushed, upstreamIsGone, isAncestorOfAnotherLocalBranch] =
+        await Promise.all([
+          computeMergeStatus(registry, repo.id, branch.sha, defaultBranch?.sha),
+          computeIsPushed(registry, repo.id, branch.name, branch.sha, remoteRefs),
+          computeUpstreamIsGone(registry, repo.id, branch.name, remoteRefs),
+          computeIsAncestorOfAnotherLocalBranch(
+            registry,
+            repo.id,
+            branch.name,
+            branch.sha,
+            repo.branches
+          ),
+        ]);
 
-    result.set(branch.name, {
-      isCurrent: branch.name === repo.currentBranch,
-      isProtected:
-        (defaultBranch !== undefined && branch.name === defaultBranch.name) ||
-        matchesAnyPattern(branch.name, protectedBranchPatterns),
-      mergeStatus,
-      isPushed,
-      existsOnRemote: computeExistsOnRemote(remoteRefs, branch.name),
-      upstreamIsGone,
-      isAncestorOfAnotherLocalBranch,
-    });
-  }
-  return result;
+      return [
+        branch.name,
+        {
+          isCurrent: branch.name === repo.currentBranch,
+          isProtected:
+            (defaultBranch !== undefined && branch.name === defaultBranch.name) ||
+            matchesAnyPattern(branch.name, protectedBranchPatterns),
+          mergeStatus,
+          isPushed,
+          existsOnRemote: computeExistsOnRemote(remoteRefs, branch.name),
+          upstreamIsGone,
+          isAncestorOfAnotherLocalBranch,
+        },
+      ];
+    }
+  );
+  return new Map(entries);
 }

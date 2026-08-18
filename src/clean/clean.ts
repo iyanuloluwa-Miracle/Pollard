@@ -381,6 +381,7 @@ export async function runCleanSingleBranch(
   deps: CleanDeps,
   element: Extract<BranchTreeElement, { kind: 'branch' }>
 ): Promise<void> {
+  await deps.registry.whenReady();
   const repo = deps.registry.repos.find((r) => r.id === element.repoId);
   if (!repo) return;
   const branchAssessment = deps.branchTreeProvider

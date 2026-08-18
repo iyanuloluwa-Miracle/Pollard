@@ -128,8 +128,14 @@ export class BranchTreeProvider
       }),
       registry.onDidChangeRefs((repoId) => this.fireRepoChange(repoId))
     );
-    this.updateHasGitRepoContext();
-    this.updateHasScannedContext();
+    // registry.repos is empty until the background enumeration in
+    // RepoRegistry.initialize() completes — recompute contexts once it has,
+    // rather than reporting "no repo" here while that's still in flight.
+    void registry.whenReady().then(() => {
+      this.updateHasGitRepoContext();
+      this.updateHasScannedContext();
+      this._onDidChangeTreeData.fire(undefined);
+    });
   }
 
   /** Replace-all semantics for one repo's assessments. */
@@ -213,7 +219,9 @@ export class BranchTreeProvider
     }
   }
 
-  getChildren(element?: BranchTreeElement): BranchTreeElement[] {
+  /** Async so the first call — driven by the tree actually rendering — is what the repo enumeration cost lands behind, instead of activate() blocking on it. */
+  async getChildren(element?: BranchTreeElement): Promise<BranchTreeElement[]> {
+    await this.registry.whenReady();
     if (!element) return this.getRootChildren();
     switch (element.kind) {
       case 'repo':

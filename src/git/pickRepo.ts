@@ -14,6 +14,7 @@ export async function pickRepo(
   title: string,
   errCtx: PickRepoErrorContext
 ): Promise<RepoHandle | undefined> {
+  await registry.whenReady();
   const repos = registry.repos;
   if (repos.length === 0) {
     presentError(classifyNotAGitRepo(), errCtx);

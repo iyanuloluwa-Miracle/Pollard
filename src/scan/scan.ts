@@ -39,6 +39,7 @@ async function doRunScan({
   telemetry,
 }: ScanDeps): Promise<void> {
   const errCtx = { logChannel, telemetry, command: 'pollard.scan' as const };
+  await registry.whenReady();
   const repos = registry.repos;
   if (repos.length === 0) {
     presentError(classifyNotAGitRepo(), errCtx);

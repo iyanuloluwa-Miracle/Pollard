@@ -153,30 +153,51 @@ export class RepoRegistry implements vscode.Disposable {
   /** Fires with the repoId whose local refs changed (already debounced). */
   readonly onDidChangeRefs = this._onDidChangeRefs.event;
 
-  private constructor() {}
+  private disposed = false;
+  private readonly readyPromise: Promise<void>;
 
-  static async create(): Promise<RepoRegistry> {
-    const registry = new RepoRegistry();
+  private constructor() {
+    this.readyPromise = this.initialize();
+  }
+
+  /**
+   * Returns immediately — does no git or filesystem work on the caller's
+   * time. The real enumeration (activating vscode.git if needed, resolving
+   * each repo's .git directory, wiring up watchers) runs in the background
+   * via initialize(); every read path that needs a populated repo list
+   * awaits whenReady() first, which is what makes that cost land behind the
+   * first tree render instead of blocking extension activation.
+   */
+  static create(): RepoRegistry {
+    return new RepoRegistry();
+  }
+
+  /** Resolves once the initial repository enumeration has completed. Cheap to await repeatedly — resolves instantly once the underlying promise has settled. */
+  whenReady(): Promise<void> {
+    return this.readyPromise;
+  }
+
+  private async initialize(): Promise<void> {
     const ext = vscode.extensions.getExtension<GitExtension>('vscode.git');
-    if (!ext) return registry;
+    if (!ext) return;
 
     const exports = ext.isActive ? ext.exports : await ext.activate();
     const api = exports.getAPI(1);
-    registry.gitPath = api.git?.path;
+    this.gitPath = api.git?.path;
 
     for (const repository of api.repositories) {
-      await registry.addRepo(repository);
+      await this.addRepo(repository);
     }
-    registry.disposables.push(
+    if (this.disposed) return;
+    this.disposables.push(
       api.onDidOpenRepository((repository) => {
-        void registry.addRepo(repository).then(() => registry._onDidChangeRepos.fire());
+        void this.addRepo(repository).then(() => this._onDidChangeRepos.fire());
       }),
       api.onDidCloseRepository((repository) => {
-        registry.removeRepo(repository.rootUri.fsPath);
-        registry._onDidChangeRepos.fire();
+        this.removeRepo(repository.rootUri.fsPath);
+        this._onDidChangeRepos.fire();
       })
     );
-    return registry;
   }
 
   get repos(): RepoHandle[] {
@@ -293,6 +314,7 @@ export class RepoRegistry implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const entry of this.entries.values()) entry.watcher?.dispose();
     this.entries.clear();
     for (const d of this.disposables) d.dispose();

@@ -18,11 +18,18 @@ import { StatusBarController } from './views/statusBar';
 const MIN_AUTO_SCAN_INTERVAL_MINUTES = 5;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const activationStart = Date.now();
+
   // No scan has run yet, so auth isn't known to be blocking anything —
   // avoid greeting a first-time user with a sign-in warning.
   void vscode.commands.executeCommand('setContext', 'pollard.isSignedIn', true);
 
-  const registry = await RepoRegistry.create();
+  // RepoRegistry.create() returns synchronously — it does no git or
+  // filesystem work here. The real repo enumeration runs in the background
+  // and is only ever awaited (via registry.whenReady()) from the tree
+  // provider's first getChildren call and from command handlers, so it
+  // never blocks activation itself. See PERFORMANCE.md.
+  const registry = RepoRegistry.create();
   const branchTreeProvider = new BranchTreeProvider(registry);
   const statusBar = new StatusBarController(registry);
   const logChannel = vscode.window.createOutputChannel('Pollard', { log: true });
@@ -73,6 +80,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const handle = setInterval(() => void runScan(scanDeps), effectiveMinutes * 60_000);
     context.subscriptions.push({ dispose: () => clearInterval(handle) });
   }
+
+  logChannel.trace(`activate() returned in ${Date.now() - activationStart}ms`);
 }
 
 export function deactivate(): void {}
