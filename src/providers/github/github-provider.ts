@@ -88,7 +88,7 @@ export class GitHubProvider implements Provider {
       if (hasInsufficientScope(response, data)) throw new InsufficientScopeError('github');
       this.recordResponse(response);
       if (data?.data?.rateLimit) this.rateLimiter.updateFromGraphQLRateLimit(data.data.rateLimit);
-      for (const [branch, prs] of parseBatchRefsResponse(data.data, aliasToBranch)) {
+      for (const [branch, prs] of parseBatchRefsResponse(data?.data, aliasToBranch)) {
         result.set(branch, prs);
       }
     }

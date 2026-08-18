@@ -5,12 +5,12 @@
     "lib": ["ES2022"],
     "moduleResolution": "Node10",
     "outDir": "out",
-    "rootDir": "src",
+    "rootDir": ".",
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "exclude": ["node_modules", ".vscode-test", "dist", "out", "vitest.config.mts"]
+  "exclude": ["node_modules", ".vscode-test", "dist", "out", "vitest.config.mts", "test"]
 }

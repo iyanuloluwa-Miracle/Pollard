@@ -107,11 +107,11 @@ export interface GithubRefExistsResponseData {
 }
 
 export function parseBatchRefsResponse(
-  data: GithubBatchResponseData,
+  data: GithubBatchResponseData | undefined,
   aliasToBranch: Map<string, string>
 ): Map<string, PullRequestInfo[]> {
   const out = new Map<string, PullRequestInfo[]>();
-  if (!data.repository) return out;
+  if (!data?.repository) return out;
 
   for (const [alias, branch] of aliasToBranch) {
     const ref = data.repository[alias];
