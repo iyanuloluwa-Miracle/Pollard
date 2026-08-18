@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { Ref } from './git-api-types';
 import { REF_TYPE_REMOTE_HEAD, pickPrimaryRemoteName } from './git-extension';
 import { matchesAnyPattern } from './protected-branches';
@@ -146,12 +147,18 @@ async function computeIsAncestorOfAnotherLocalBranch(
   return false;
 }
 
-/** Computes every local branch's facts (everything except pullRequest) for one repo. */
+/**
+ * Computes every local branch's facts (everything except pullRequest) for
+ * one repo. If `token` is cancelled mid-computation, branches not yet
+ * started are skipped and simply absent from the returned map — the caller
+ * treats a missing branch the same as one phase 1 never reached.
+ */
 export async function computeLocalBranchFacts(
   registry: RepoRegistry,
   repo: RepoHandle,
   defaultBranch: DefaultBranchInfo | undefined,
-  protectedBranchPatterns: string[]
+  protectedBranchPatterns: string[],
+  token?: vscode.CancellationToken
 ): Promise<Map<string, Omit<BranchFacts, 'pullRequest'>>> {
   const allRefs = registry.getRefs(repo.id) ?? [];
   const remoteRefs = allRefs.filter((r) => r.type === REF_TYPE_REMOTE_HEAD);
@@ -159,7 +166,9 @@ export async function computeLocalBranchFacts(
   const entries = await mapWithConcurrency(
     repo.branches,
     BRANCH_FACTS_CONCURRENCY,
-    async (branch): Promise<[string, Omit<BranchFacts, 'pullRequest'>]> => {
+    async (branch): Promise<[string, Omit<BranchFacts, 'pullRequest'>] | undefined> => {
+      if (token?.isCancellationRequested) return undefined;
+
       const [mergeStatus, isPushed, upstreamIsGone, isAncestorOfAnotherLocalBranch] =
         await Promise.all([
           computeMergeStatus(registry, repo.id, branch.sha, defaultBranch?.sha),
@@ -190,5 +199,5 @@ export async function computeLocalBranchFacts(
       ];
     }
   );
-  return new Map(entries);
+  return new Map(entries.filter((e) => e !== undefined));
 }

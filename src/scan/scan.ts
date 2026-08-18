@@ -67,7 +67,13 @@ async function doRunScan({
         const protectedBranchPatterns = getProtectedBranchPatterns(repo.rootPath);
         localFactsByRepo.set(
           repo.id,
-          await computeLocalBranchFacts(registry, repo, defaultBranch, protectedBranchPatterns)
+          await computeLocalBranchFacts(
+            registry,
+            repo,
+            defaultBranch,
+            protectedBranchPatterns,
+            token
+          )
         );
         if (repo.isDetachedHead) {
           presentError(classifyDetachedHead(repo.label), errCtx);
