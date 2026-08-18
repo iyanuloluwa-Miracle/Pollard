@@ -1,22 +1,16 @@
 import * as vscode from 'vscode';
-import { RepoRegistry } from '../git/repo-registry';
-import { PullRequestInfo } from '../providers/types';
-import { SafetyAssessment, SafetyStatus } from '../safety/engine';
-import { formatRelativeDate } from '../util/relative-time';
-
-export interface BranchAssessment {
-  assessment: SafetyAssessment;
-  pullRequest: PullRequestInfo | null;
-}
-
-export type BucketKind = 'safe' | 'squashMerged' | 'warnings' | 'protected' | 'unscanned';
-
-export type BranchTreeElement =
-  | { kind: 'repo'; id: string; repoId: string }
-  | { kind: 'bucket'; id: string; repoId: string; bucket: BucketKind }
-  | { kind: 'branch'; id: string; repoId: string; branchName: string; sha: string }
-  | { kind: 'message'; id: string; repoId: string; text: string; commandId?: string }
-  | { kind: 'banner'; id: string; text: string };
+import { RepoRegistry } from '../workspace';
+import { statusIconAndColor, statusToBucket, UNSCANNED_CONTEXT_VALUE, BucketKind } from '../safety';
+import { BranchAssessment, SafetyStatus } from '../safety';
+import { formatRelativeDate } from '../util';
+import {
+  BranchTreeElement,
+  makeBannerElement,
+  makeBranchElement,
+  makeBucketElement,
+  makeMessageElement,
+  makeRepoElement,
+} from './items';
 
 const BUCKET_ORDER: BucketKind[] = ['safe', 'squashMerged', 'warnings', 'protected', 'unscanned'];
 
@@ -50,37 +44,6 @@ const BUCKET_DISPLAY: Record<
     defaultExpanded: false,
   },
 };
-
-const STATUS_DISPLAY: Record<
-  SafetyStatus,
-  { bucket: BucketKind; icon: string; color: string | undefined }
-> = {
-  SAFE_MERGED: { bucket: 'safe', icon: 'check', color: 'charts.green' },
-  SAFE_SQUASH_MERGED: { bucket: 'squashMerged', icon: 'check-all', color: 'charts.green' },
-  WARNING_CLOSED_PR: {
-    bucket: 'warnings',
-    icon: 'git-pull-request-closed',
-    color: 'charts.orange',
-  },
-  WARNING_UNMERGED: { bucket: 'warnings', icon: 'git-pull-request', color: 'charts.yellow' },
-  WARNING_NO_PR: { bucket: 'warnings', icon: 'warning', color: 'charts.yellow' },
-  UNKNOWN: { bucket: 'warnings', icon: 'question', color: 'charts.yellow' },
-  PROTECTED: { bucket: 'protected', icon: 'shield', color: 'charts.blue' },
-  CURRENT: { bucket: 'protected', icon: 'target', color: 'charts.purple' },
-};
-
-const UNSCANNED_CONTEXT_VALUE = 'UNSCANNED';
-
-export function statusToBucket(status: SafetyStatus): BucketKind {
-  return STATUS_DISPLAY[status].bucket;
-}
-
-export function statusIconAndColor(status: SafetyStatus): {
-  icon: string;
-  color: string | undefined;
-} {
-  return STATUS_DISPLAY[status];
-}
 
 function buildTooltip(branchAssessment: BranchAssessment | undefined): vscode.MarkdownString {
   if (!branchAssessment) {
@@ -349,8 +312,8 @@ export class BranchTreeProvider
     const item = new vscode.TreeItem(element.branchName, vscode.TreeItemCollapsibleState.None);
     item.id = element.id;
 
-    const status = branchAssessment?.assessment.status;
-    const display = status ? STATUS_DISPLAY[status] : { icon: 'circle-outline', color: undefined };
+    const status: SafetyStatus | undefined = branchAssessment?.assessment.status;
+    const display = status ? statusIconAndColor(status) : { icon: 'circle-outline', color: undefined };
     item.iconPath = new vscode.ThemeIcon(
       display.icon,
       display.color ? new vscode.ThemeColor(display.color) : undefined
@@ -412,29 +375,4 @@ export class BranchTreeProvider
       repos.length === 0 || (repos.length === 1 && this.scannedRepoIds.has(repos[0].id));
     void vscode.commands.executeCommand('setContext', 'pollard.hasScanned', hasScanned);
   }
-}
-
-function makeRepoElement(repoId: string): BranchTreeElement {
-  return { kind: 'repo', id: `repo:${repoId}`, repoId };
-}
-
-function makeBucketElement(repoId: string, bucket: BucketKind): BranchTreeElement {
-  return { kind: 'bucket', id: `bucket:${repoId}:${bucket}`, repoId, bucket };
-}
-
-function makeBranchElement(repoId: string, branchName: string, sha: string): BranchTreeElement {
-  return { kind: 'branch', id: `branch:${repoId}:${branchName}`, repoId, branchName, sha };
-}
-
-function makeMessageElement(
-  repoId: string,
-  slug: string,
-  text: string,
-  commandId?: string
-): BranchTreeElement {
-  return { kind: 'message', id: `message:${repoId}:${slug}`, repoId, text, commandId };
-}
-
-function makeBannerElement(): BranchTreeElement {
-  return { kind: 'banner', id: 'banner:offline', text: 'Offline — showing cached results only.' };
 }

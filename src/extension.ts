@@ -1,19 +1,10 @@
 import * as vscode from 'vscode';
-import { runPruneBackups } from './backup/prune';
-import { runRestore } from './backup/restore';
-import { CleanDeps, runClean, runCleanSingleBranch } from './clean/clean';
-import { registerCleanPreviewProvider } from './clean/preview';
+import { registerCommands, runScan, ScanDeps } from './commands';
 import { getAutoScanIntervalMinutes, getAutoScanOnStartup } from './config';
-import { RepoRegistry } from './git/repo-registry';
-import { connectGitlab } from './providers/gitlab/gitlab-auth';
-import { getGithubSession } from './providers/github/github-auth';
-import { runRefresh } from './scan/refresh';
-import { runScan } from './scan/scan';
-import { ScanDeps } from './scan/types';
-import { clearCache } from './state/cache';
+import { PollardLogger } from './logger';
 import { PollardTelemetryReporter } from './telemetry';
-import { BranchTreeElement, BranchTreeProvider } from './views/branchTree';
-import { StatusBarController } from './views/statusBar';
+import { BranchTreeProvider, registerCleanPreviewProvider, StatusBarController } from './views';
+import { RepoRegistry } from './workspace';
 
 const MIN_AUTO_SCAN_INTERVAL_MINUTES = 5;
 
@@ -32,7 +23,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const registry = RepoRegistry.create();
   const branchTreeProvider = new BranchTreeProvider(registry);
   const statusBar = new StatusBarController(registry);
-  const logChannel = vscode.window.createOutputChannel('Pollard', { log: true });
+  const logChannel = new PollardLogger('Pollard');
   const telemetry = new PollardTelemetryReporter(logChannel);
   const scanDeps: ScanDeps = {
     context,
@@ -42,7 +33,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logChannel,
     telemetry,
   };
-  const cleanDeps: CleanDeps = { ...scanDeps };
 
   context.subscriptions.push(
     registry,
@@ -52,21 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     telemetry,
     registerCleanPreviewProvider(),
     vscode.window.registerTreeDataProvider('pollard.branches', branchTreeProvider),
-    vscode.commands.registerCommand('pollard.scan', () => runScan(scanDeps)),
-    vscode.commands.registerCommand('pollard.clean', () => runClean(cleanDeps)),
-    vscode.commands.registerCommand('pollard.restore', () => runRestore(cleanDeps)),
-    vscode.commands.registerCommand('pollard.pruneBackups', () => runPruneBackups(cleanDeps)),
-    vscode.commands.registerCommand('pollard.refresh', () => runRefresh(scanDeps)),
-    vscode.commands.registerCommand('pollard.connectGithub', () => getGithubSession(true)),
-    vscode.commands.registerCommand('pollard.connectGitlab', () => connectGitlab(context)),
-    vscode.commands.registerCommand('pollard.clearCache', async () => {
-      await clearCache(context);
-      vscode.window.showInformationMessage('Pollard: Cache cleared.');
-    }),
-    vscode.commands.registerCommand('pollard.deleteBranch', (element: BranchTreeElement) => {
-      if (element.kind !== 'branch') return;
-      return runCleanSingleBranch(cleanDeps, element);
-    })
+    ...registerCommands(context, scanDeps)
   );
 
   // Both auto-scan mechanisms are strictly opt-in and default off — a fresh

@@ -1,9 +1,9 @@
 import * as assert from 'assert';
-import { resolveDefaultBranch, computeLocalBranchFacts } from '../../src/git/branch-facts';
-import { RepoRegistry } from '../../src/git/repo-registry';
-import { PullRequestInfo } from '../../src/providers/types';
-import { BranchFacts } from '../../src/safety/engine';
-import { buildRepoAssessments } from '../../src/scan/assess';
+import { resolveDefaultBranch, computeLocalBranchFacts } from '../../src/git/branches';
+import { RepoRegistry } from '../../src/workspace/repositories';
+import { PullRequestInfo } from '../../src/providers/provider';
+import { BranchFacts } from '../../src/safety/types';
+import { buildRepoAssessments } from '../../src/safety/engine';
 
 function fakePr(branch: string, merged: boolean): PullRequestInfo {
   return {

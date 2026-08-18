@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ErrorCategory, PollardCommandId, TelemetryReporter } from './errors';
+import { PollardLogger } from './logger';
 
 /**
  * Local-only stand-in: goes through the real vscode.env.createTelemetryLogger
@@ -13,7 +14,7 @@ export class PollardTelemetryReporter implements TelemetryReporter, vscode.Dispo
   private readonly disposables: vscode.Disposable[] = [];
   private enabled: boolean;
 
-  constructor(private readonly logChannel: vscode.LogOutputChannel) {
+  constructor(private readonly logChannel: PollardLogger) {
     this.enabled = vscode.env.isTelemetryEnabled;
     this.disposables.push(
       vscode.env.onDidChangeTelemetryEnabled((enabled) => {
