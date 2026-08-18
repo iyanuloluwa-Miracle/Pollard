@@ -166,6 +166,7 @@ async function doRunScan({
       // Phase 3 — assessing.
       progress.report({ message: 'Assessing…' });
       for (const repo of repos) {
+        if (token.isCancellationRequested) break;
         const localFacts = localFactsByRepo.get(repo.id);
         if (!localFacts) continue;
         const assessments = buildRepoAssessments(localFacts, prsByRepo.get(repo.id) ?? new Map());
