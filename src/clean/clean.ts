@@ -257,7 +257,7 @@ async function restoreDeleted(
     );
     if (choice === 'Show Log') deps.logChannel.show();
   } else {
-    vscode.window.showInformationMessage(summary);
+    void vscode.window.showInformationMessage(summary);
   }
 }
 
@@ -357,13 +357,13 @@ export async function runClean(deps: CleanDeps): Promise<void> {
 
   const assessments = deps.branchTreeProvider.getAssessments(repo.id);
   if (!assessments) {
-    vscode.window.showInformationMessage('Pollard: Run Pollard: Scan first.');
+    void vscode.window.showInformationMessage('Pollard: Run Pollard: Scan first.');
     return;
   }
 
   const candidates = buildEligibleCandidates(repo, assessments);
   if (candidates.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No deletable branches found.');
+    void vscode.window.showInformationMessage('Pollard: No deletable branches found.');
     return;
   }
 
@@ -377,7 +377,7 @@ export async function runClean(deps: CleanDeps): Promise<void> {
   });
   if (!picked) return;
   if (picked.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No branches selected.');
+    void vscode.window.showInformationMessage('Pollard: No branches selected.');
     return;
   }
 

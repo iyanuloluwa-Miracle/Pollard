@@ -48,7 +48,7 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
 
   const total = perRepo.reduce((n, r) => n + r.stale.length, 0);
   if (total === 0) {
-    vscode.window.showInformationMessage(
+    void vscode.window.showInformationMessage(
       `Pollard: No backups older than ${retentionDays} day(s) found.`
     );
     return;
@@ -103,6 +103,6 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
     const c = await vscode.window.showWarningMessage(`${summary} ${failed} failed.`, 'Show Log');
     if (c === 'Show Log') deps.logChannel.show();
   } else {
-    vscode.window.showInformationMessage(summary);
+    void vscode.window.showInformationMessage(summary);
   }
 }
