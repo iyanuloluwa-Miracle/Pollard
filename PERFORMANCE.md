@@ -2,8 +2,8 @@
 
 This document records the activation-cost audit performed on the extension
 and the guarantees the code now enforces. Re-run the measurements below
-after any change that touches `src/extension.ts`, `src/git/repo-registry.ts`,
-or `src/git/branch-facts.ts`.
+after any change that touches `src/extension.ts`, `src/workspace/repositories.ts`,
+or `src/git/branches.ts`.
 
 ## 1. `activate()` does no git or network work
 
@@ -17,7 +17,7 @@ previously activated the built-in `vscode.git` extension if needed, read
 — all `await`ed directly inside `activate()`, so the extension host couldn't
 report itself "active" until that finished.
 
-`RepoRegistry.create()` (`src/git/repo-registry.ts`) is now **synchronous**:
+`RepoRegistry.create()` (`src/workspace/repositories.ts`) is now **synchronous**:
 it returns an instance immediately and kicks off that same enumeration in
 the background via a private `initialize()` promise. Nothing in `activate()`
 awaits it. Every read path that actually needs a populated repo list —
@@ -66,7 +66,7 @@ above is a code-path-accurate proxy, not a replacement for it.
 
 ## 3. Bundle size
 
-`npm run package` (`node esbuild.js --production`, wired into
+`npm run package` (`node scripts/esbuild.mjs --production`, wired into
 `vscode:prepublish`) produces the minified, sourcemap-free bundle actually
 shipped. Previously `vscode:prepublish` ran plain `npm run compile`, which
 skips minification and includes a sourcemap — the packaged `.vsix` would
@@ -86,7 +86,7 @@ all of it is hand-rolled against `fetch`.
 
 ## 4. Git subprocess concurrency is bounded, not unbounded or serial
 
-`computeLocalBranchFacts` (`src/git/branch-facts.ts`) is what fans out
+`computeLocalBranchFacts` (`src/git/branches.ts`) is what fans out
 per-branch git lookups (merge-base, push status, upstream-gone, ancestor
 checks) via the `vscode.git` extension's own `Repository` methods. On a
 200-branch repo this previously ran fully serially (each branch awaited
