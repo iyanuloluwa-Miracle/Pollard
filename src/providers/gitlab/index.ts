@@ -1,2 +1,2 @@
 export { GitLabProvider } from './client';
-export { connectGitlab, getGitlabToken } from './auth';
+export { connectGitlab, getGitlabToken, probeGitlabAuth } from './auth';

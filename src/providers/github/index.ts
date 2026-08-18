@@ -1,2 +1,2 @@
 export { GitHubProvider } from './client';
-export { getGithubSession } from './auth';
+export { getGithubSession, probeGithubAuth } from './auth';

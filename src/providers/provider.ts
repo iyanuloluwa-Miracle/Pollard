@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { getGitHubEnterpriseHost, getGitLabHost } from '../config';
 import { ParsedRemote } from './remoteUrl';
+import { RateLimiter } from './rateLimit';
 import { GitHubProvider } from './github/client';
 import { GitLabProvider } from './gitlab/client';
 import { NoopProvider } from './noop';
@@ -26,6 +27,9 @@ export interface RateLimitStatus {
 
 export type ProviderId = 'github' | 'gitlab' | 'noop';
 
+/** Tri-state auth status used by pollard.doctor — never exposes the token/session value itself. */
+export type AuthProbeStatus = 'signedIn' | 'noSession' | 'tokenInvalid';
+
 export interface Provider {
   readonly id: ProviderId;
 
@@ -47,6 +51,31 @@ export interface Provider {
 
   /** Last-known rate-limit state; does not itself trigger a network call. */
   getRateLimitStatus(): RateLimitStatus;
+}
+
+const rateLimiterRegistry = new Map<string, RateLimiter>();
+
+/**
+ * Providers are constructed fresh on every createProvider() call (once per
+ * repo per scan), so a RateLimiter owned by the provider instance itself
+ * would be discarded the moment that call returns — pollard.doctor's "last
+ * rate limit status" would always read empty. This registry persists one
+ * RateLimiter per (kind, host) for the extension host's lifetime instead,
+ * shared across every provider instance constructed for that host.
+ */
+function getSharedRateLimiter(kind: 'github' | 'gitlab', host: string): RateLimiter {
+  const key = `${kind}:${host}`;
+  let limiter = rateLimiterRegistry.get(key);
+  if (!limiter) {
+    limiter = new RateLimiter();
+    rateLimiterRegistry.set(key, limiter);
+  }
+  return limiter;
+}
+
+/** Last-known rate-limit status for a provider kind + host, without constructing a provider or making a network call. Used by pollard.doctor. */
+export function getProviderRateLimitStatus(kind: 'github' | 'gitlab', host: string): RateLimitStatus {
+  return getSharedRateLimiter(kind, host).getStatus();
 }
 
 export interface CreateProviderOptions {
@@ -80,16 +109,23 @@ export function createProvider({
     remote.host === 'github.com' ||
     (githubEnterpriseHost && remote.host === githubEnterpriseHost)
   ) {
+    const enterpriseHost = remote.host === 'github.com' ? undefined : remote.host;
     return {
-      provider: new GitHubProvider(remote, remote.host === 'github.com' ? undefined : remote.host),
+      provider: new GitHubProvider(
+        remote,
+        enterpriseHost,
+        getSharedRateLimiter('github', enterpriseHost ?? 'github.com')
+      ),
     };
   }
   if (remote.host === 'gitlab.com' || (gitlabInstanceHost && remote.host === gitlabInstanceHost)) {
+    const instanceHost = remote.host === 'gitlab.com' ? undefined : remote.host;
     return {
       provider: new GitLabProvider(
         context,
         remote,
-        remote.host === 'gitlab.com' ? undefined : remote.host
+        instanceHost,
+        getSharedRateLimiter('gitlab', instanceHost ?? 'gitlab.com')
       ),
     };
   }

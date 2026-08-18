@@ -49,13 +49,15 @@ function hasInsufficientScope<T>(
 export class GitHubProvider implements Provider {
   readonly id = 'github' as const;
 
-  private readonly rateLimiter = new RateLimiter();
+  private readonly rateLimiter: RateLimiter;
   private readonly graphqlUrl: string;
 
   constructor(
     private readonly remote: ParsedRemote,
-    enterpriseHost?: string
+    enterpriseHost?: string,
+    rateLimiter: RateLimiter = new RateLimiter()
   ) {
+    this.rateLimiter = rateLimiter;
     this.graphqlUrl = enterpriseHost
       ? `https://${enterpriseHost}/api/graphql`
       : 'https://api.github.com/graphql';

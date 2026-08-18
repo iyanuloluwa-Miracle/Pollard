@@ -115,15 +115,17 @@ async function fetchMergeRequestsIndex(
 export class GitLabProvider implements Provider {
   readonly id = 'gitlab' as const;
 
-  private readonly rateLimiter = new RateLimiter();
+  private readonly rateLimiter: RateLimiter;
   private readonly apiBase: string;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly remote: ParsedRemote,
-    instanceHost?: string
+    instanceHost?: string,
+    rateLimiter: RateLimiter = new RateLimiter()
   ) {
     this.apiBase = `https://${instanceHost ?? 'gitlab.com'}/api/v4`;
+    this.rateLimiter = rateLimiter;
   }
 
   async getPullRequestsForBranches(
