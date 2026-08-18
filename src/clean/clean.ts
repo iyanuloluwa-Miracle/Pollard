@@ -1,17 +1,16 @@
 import * as vscode from 'vscode';
 import { writeBackupRef, restoreBranchFromBackup } from '../backup/backupRefs';
 import { getMinimumScoreForBulkDelete } from '../config';
+import { classifyError, logAndTrackError, PollardCommandId } from '../errors';
 import { pickRepo } from '../git/pickRepo';
-import { RepoHandle, RepoRegistry } from '../git/repo-registry';
+import { RepoHandle } from '../git/repo-registry';
 import { SafetyStatus } from '../safety/engine';
 import { tallyBucketCounts } from '../scan/assess';
 import { ScanDeps } from '../scan/types';
 import { BranchAssessment, BranchTreeElement, statusIconAndColor } from '../views/branchTree';
 import { PreviewEntry, clearPreviewContent, generatePreviewId, showCleanPreview } from './preview';
 
-export interface CleanDeps extends ScanDeps {
-  cleanLogChannel: vscode.OutputChannel;
-}
+export type CleanDeps = ScanDeps;
 
 interface CleanCandidate {
   repoId: string;
@@ -141,34 +140,46 @@ async function confirmDeletion(repo: RepoHandle, candidates: CleanCandidate[]): 
 }
 
 async function deleteWithBackup(
-  registry: RepoRegistry,
+  deps: CleanDeps,
   repoId: string,
   branchName: string,
-  fallbackSha: string
+  fallbackSha: string,
+  command: PollardCommandId
 ): Promise<BranchDeleteResult> {
+  const errCtx = { logChannel: deps.logChannel, telemetry: deps.telemetry, command };
+
   // Re-resolve the current tip immediately before backing up — the branch
   // may have moved since the QuickPick/preview snapshot; the backup must
   // protect the SHA actually about to be deleted, not a stale one.
-  const current = await registry.getBranchDetails(repoId, branchName);
+  const current = await deps.registry.getBranchDetails(repoId, branchName);
   const sha = current?.commit ?? fallbackSha;
 
   let backupRefPath: string;
   try {
-    ({ refPath: backupRefPath } = await writeBackupRef(registry, repoId, branchName, sha));
+    ({ refPath: backupRefPath } = await writeBackupRef(deps.registry, repoId, branchName, sha));
   } catch (err) {
     // Fail-safe: never delete without a safety net.
-    return { repoId, branchName, sha, outcome: { kind: 'backupFailed', error: String(err) } };
-  }
-
-  try {
-    await registry.deleteBranch(repoId, branchName, true);
-    return { repoId, branchName, sha, outcome: { kind: 'deleted', backupRefPath } };
-  } catch (err) {
+    const classified = classifyError(err);
+    logAndTrackError(classified, errCtx);
     return {
       repoId,
       branchName,
       sha,
-      outcome: { kind: 'deleteFailed', backupRefPath, error: String(err) },
+      outcome: { kind: 'backupFailed', error: classified.message },
+    };
+  }
+
+  try {
+    await deps.registry.deleteBranch(repoId, branchName, true);
+    return { repoId, branchName, sha, outcome: { kind: 'deleted', backupRefPath } };
+  } catch (err) {
+    const classified = classifyError(err);
+    logAndTrackError(classified, errCtx);
+    return {
+      repoId,
+      branchName,
+      sha,
+      outcome: { kind: 'deleteFailed', backupRefPath, error: classified.message },
     };
   }
 }
@@ -217,8 +228,10 @@ async function restoreDeleted(
   deps: CleanDeps,
   repoId: string,
   succeeded: (BranchDeleteResult & { outcome: { kind: 'deleted'; backupRefPath: string } })[],
-  originalAssessments: Map<string, BranchAssessment>
+  originalAssessments: Map<string, BranchAssessment>,
+  command: PollardCommandId
 ): Promise<void> {
+  const errCtx = { logChannel: deps.logChannel, telemetry: deps.telemetry, command };
   const results: BranchRestoreResult[] = [];
   for (const r of succeeded) {
     try {
@@ -227,11 +240,13 @@ async function restoreDeleted(
       if (original) deps.branchTreeProvider.setAssessment(repoId, r.branchName, original);
       results.push({ repoId, branchName: r.branchName, ok: true });
     } catch (err) {
-      results.push({ repoId, branchName: r.branchName, ok: false, error: String(err) });
+      const classified = classifyError(err);
+      logAndTrackError(classified, errCtx);
+      results.push({ repoId, branchName: r.branchName, ok: false, error: classified.message });
     }
   }
   recomputeStatusBar(deps, repoId);
-  writeRestoreResultsToLog(deps.cleanLogChannel, results);
+  writeRestoreResultsToLog(deps.logChannel, results);
 
   const failed = results.filter((r) => !r.ok).length;
   const summary = `Pollard: Restored ${results.length - failed}/${results.length} branch(es).`;
@@ -240,7 +255,7 @@ async function restoreDeleted(
       `${summary} ${failed} failed.`,
       'Show Log'
     );
-    if (choice === 'Show Log') deps.cleanLogChannel.show();
+    if (choice === 'Show Log') deps.logChannel.show();
   } else {
     vscode.window.showInformationMessage(summary);
   }
@@ -250,9 +265,10 @@ async function showCleanResult(
   deps: CleanDeps,
   repo: RepoHandle,
   candidates: CleanCandidate[],
-  results: BranchDeleteResult[]
+  results: BranchDeleteResult[],
+  command: PollardCommandId
 ): Promise<void> {
-  writeDeleteResultsToLog(deps.cleanLogChannel, repo, results);
+  writeDeleteResultsToLog(deps.logChannel, repo, results);
 
   const succeeded = results.filter(isDeleted);
   const failed = results.length - succeeded.length;
@@ -267,10 +283,10 @@ async function showCleanResult(
       : await vscode.window.showInformationMessage(summary, ...buttons);
 
   if (choice === 'Show Log') {
-    deps.cleanLogChannel.show();
+    deps.logChannel.show();
   } else if (choice === 'Restore') {
     const originalByName = new Map(candidates.map((c) => [c.branchName, c.branchAssessment]));
-    await restoreDeleted(deps, repo.id, succeeded, originalByName);
+    await restoreDeleted(deps, repo.id, succeeded, originalByName, command);
   }
 }
 
@@ -285,7 +301,8 @@ async function showCleanResult(
 async function runCleanFlow(
   deps: CleanDeps,
   repo: RepoHandle,
-  candidates: CleanCandidate[]
+  candidates: CleanCandidate[],
+  command: PollardCommandId
 ): Promise<void> {
   if (candidates.length === 0) return;
 
@@ -301,7 +318,7 @@ async function runCleanFlow(
     // STEP 4 — backup-then-delete, sequential per branch.
     const results: BranchDeleteResult[] = [];
     for (const c of candidates) {
-      results.push(await deleteWithBackup(deps.registry, repo.id, c.branchName, c.sha));
+      results.push(await deleteWithBackup(deps, repo.id, c.branchName, c.sha, command));
     }
     for (const r of results) {
       if (isDeleted(r)) deps.branchTreeProvider.setAssessment(r.repoId, r.branchName, undefined);
@@ -309,7 +326,7 @@ async function runCleanFlow(
     recomputeStatusBar(deps, repo.id);
 
     // STEP 5 — result notification.
-    await showCleanResult(deps, repo, candidates, results);
+    await showCleanResult(deps, repo, candidates, results, command);
   } finally {
     clearPreviewContent(previewId);
   }
@@ -317,7 +334,12 @@ async function runCleanFlow(
 
 /** Entry point 1: Command Palette / toolbar. Repo-picks (if needed), then the multi-select QuickPick, then runCleanFlow. */
 export async function runClean(deps: CleanDeps): Promise<void> {
-  const repo = await pickRepo(deps.registry, 'Pollard: Clean — choose a repository');
+  const command: PollardCommandId = 'pollard.clean';
+  const repo = await pickRepo(deps.registry, 'Pollard: Clean — choose a repository', {
+    logChannel: deps.logChannel,
+    telemetry: deps.telemetry,
+    command,
+  });
   if (!repo) return;
 
   const assessments = deps.branchTreeProvider.getAssessments(repo.id);
@@ -349,7 +371,8 @@ export async function runClean(deps: CleanDeps): Promise<void> {
   await runCleanFlow(
     deps,
     repo,
-    picked.map((i) => i.candidate)
+    picked.map((i) => i.candidate),
+    command
   );
 }
 
@@ -365,7 +388,17 @@ export async function runCleanSingleBranch(
     ?.get(element.branchName);
   if (!branchAssessment) return; // shouldn't happen: the menu's when-clause already restricts to deletable statuses
 
-  await runCleanFlow(deps, repo, [
-    { repoId: element.repoId, branchName: element.branchName, sha: element.sha, branchAssessment },
-  ]);
+  await runCleanFlow(
+    deps,
+    repo,
+    [
+      {
+        repoId: element.repoId,
+        branchName: element.branchName,
+        sha: element.sha,
+        branchAssessment,
+      },
+    ],
+    'pollard.deleteBranch'
+  );
 }

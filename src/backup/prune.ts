@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CleanDeps } from '../clean/clean';
 import { getBackupsRetentionDays } from '../config';
+import { classifyError, logAndTrackError } from '../errors';
 import { RepoHandle } from '../git/repo-registry';
 import { BackupRefEntry, deleteBackupRef, listBackupRefs } from './backupRefs';
 
@@ -27,13 +28,18 @@ function writePruneResultsToLog(channel: vscode.OutputChannel, results: PruneRes
  * automatically.
  */
 export async function runPruneBackups(deps: CleanDeps): Promise<void> {
+  const errCtx = {
+    logChannel: deps.logChannel,
+    telemetry: deps.telemetry,
+    command: 'pollard.pruneBackups' as const,
+  };
   const retentionDays = getBackupsRetentionDays();
   const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
   const repos = deps.registry.repos;
   const perRepo: { repo: RepoHandle; stale: BackupRefEntry[] }[] = [];
   for (const repo of repos) {
-    const stale = (await listBackupRefs(deps.registry, repo.id)).filter(
+    const stale = (await listBackupRefs(deps.registry, repo.id, deps.logChannel)).filter(
       (e) => e.timestampMs < cutoffMs
     );
     if (stale.length > 0) perRepo.push({ repo, stale });
@@ -66,17 +72,24 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
         await deleteBackupRef(deps.registry, repo.id, entry);
         results.push({ repoId: repo.id, refPath: entry.refPath, ok: true });
       } catch (err) {
-        results.push({ repoId: repo.id, refPath: entry.refPath, ok: false, error: String(err) });
+        const classified = classifyError(err);
+        logAndTrackError(classified, errCtx);
+        results.push({
+          repoId: repo.id,
+          refPath: entry.refPath,
+          ok: false,
+          error: classified.message,
+        });
       }
     }
   }
 
-  writePruneResultsToLog(deps.cleanLogChannel, results);
+  writePruneResultsToLog(deps.logChannel, results);
   const failed = results.filter((r) => !r.ok).length;
   const summary = `Pollard: Pruned ${results.length - failed}/${results.length} backup ref(s).`;
   if (failed > 0) {
     const c = await vscode.window.showWarningMessage(`${summary} ${failed} failed.`, 'Show Log');
-    if (c === 'Show Log') deps.cleanLogChannel.show();
+    if (c === 'Show Log') deps.logChannel.show();
   } else {
     vscode.window.showInformationMessage(summary);
   }

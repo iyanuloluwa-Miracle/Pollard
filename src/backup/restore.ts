@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { CleanDeps } from '../clean/clean';
+import { classifyError, logAndTrackError } from '../errors';
 import { RepoHandle } from '../git/repo-registry';
 import { pickRepo } from '../git/pickRepo';
 import { BackupRefEntry, listBackupRefs, restoreBranchFromBackup } from './backupRefs';
@@ -62,10 +63,16 @@ async function resolveRestoreName(
 
 /** Entry point for pollard.restore: repo-picks, browses that repo's backup refs via for-each-ref, and recreates the chosen one. */
 export async function runRestore(deps: CleanDeps): Promise<void> {
-  const repo = await pickRepo(deps.registry, 'Pollard: Restore — choose a repository');
+  const errCtx = {
+    logChannel: deps.logChannel,
+    telemetry: deps.telemetry,
+    command: 'pollard.restore' as const,
+  };
+
+  const repo = await pickRepo(deps.registry, 'Pollard: Restore — choose a repository', errCtx);
   if (!repo) return;
 
-  const entries = await listBackupRefs(deps.registry, repo.id);
+  const entries = await listBackupRefs(deps.registry, repo.id, deps.logChannel);
   if (entries.length === 0) {
     vscode.window.showInformationMessage(`Pollard: No backups found for ${repo.label}.`);
     return;
@@ -82,7 +89,7 @@ export async function runRestore(deps: CleanDeps): Promise<void> {
   const finalName = await resolveRestoreName(repo, picked.entry.branchName);
   if (!finalName) return;
 
-  deps.cleanLogChannel.appendLine(
+  deps.logChannel.appendLine(
     `[${new Date().toISOString()}] Restore — ${repo.label}: ${picked.entry.branchName} -> ${finalName} (${picked.entry.refPath})`
   );
 
@@ -90,11 +97,13 @@ export async function runRestore(deps: CleanDeps): Promise<void> {
     await restoreBranchFromBackup(deps.registry, repo.id, finalName, picked.entry.refPath);
     vscode.window.showInformationMessage(`Pollard: Restored "${finalName}".`);
   } catch (err) {
-    deps.cleanLogChannel.appendLine(`  FAILED — ${String(err)}`);
+    const classified = classifyError(err);
+    logAndTrackError(classified, errCtx);
+    deps.logChannel.appendLine(`  FAILED — ${classified.message}`);
     const choice = await vscode.window.showErrorMessage(
       `Pollard: Failed to restore "${finalName}".`,
       'Show Log'
     );
-    if (choice === 'Show Log') deps.cleanLogChannel.show();
+    if (choice === 'Show Log') deps.logChannel.show();
   }
 }

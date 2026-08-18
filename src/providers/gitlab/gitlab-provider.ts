@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ParsedRemote } from '../../git/remote-url';
-import { AuthRequiredError } from '../errors';
+import { AuthRequiredError, InsufficientScopeError } from '../../errors';
 import { fetchJson } from '../http';
 import { RateLimiter } from '../rate-limit';
 import { Provider, PullRequestInfo, RateLimitStatus } from '../types';
@@ -13,6 +13,17 @@ import {
 } from './gitlab-api';
 
 const MAX_PAGES = 10;
+
+/**
+ * GitLab has no scopes header — a 403 with a body mentioning "insufficient
+ * scope" is the only signal available, so this is body-text sniffing only.
+ * Ambiguous 403s (no such phrase) fall through unclassified to the existing
+ * throttle handling, never a confidently-wrong message.
+ */
+function hasInsufficientScope(status: number, data: unknown): boolean {
+  if (status !== 403 || data === undefined) return false;
+  return /insufficient[_\s-]?scope/i.test(JSON.stringify(data));
+}
 
 /**
  * GitLab's merge_requests endpoint filters by one source_branch at a time —
@@ -41,6 +52,9 @@ async function fetchMergeRequestsIndex(
       headers: { 'PRIVATE-TOKEN': privateToken },
     });
 
+    if (hasInsufficientScope(response.status, data)) {
+      throw new InsufficientScopeError('gitlab');
+    }
     if (response.status === 403 || response.status === 429) {
       rateLimiter.noteThrottled(response.headers.get('retry-after'));
       break;
@@ -104,9 +118,12 @@ export class GitLabProvider implements Provider {
     const privateToken = await getGitlabToken(this.context);
     if (!privateToken) throw new AuthRequiredError('gitlab');
 
-    const { response } = await fetchJson(branchUrl(this.apiBase, this.remote, branch), {
+    const { data, response } = await fetchJson(branchUrl(this.apiBase, this.remote, branch), {
       headers: { 'PRIVATE-TOKEN': privateToken },
     });
+    if (hasInsufficientScope(response.status, data)) {
+      throw new InsufficientScopeError('gitlab');
+    }
     if (response.status === 403 || response.status === 429) {
       this.rateLimiter.noteThrottled(response.headers.get('retry-after'));
     }

@@ -1,14 +1,22 @@
 import * as vscode from 'vscode';
+import { classifyNotAGitRepo, PollardCommandId, presentError, TelemetryReporter } from '../errors';
 import { RepoHandle, RepoRegistry } from './repo-registry';
 
-/** 0 repos → info message, undefined. 1 repo → returned directly. 2+ → a repo-picker QuickPick. */
+export interface PickRepoErrorContext {
+  logChannel: vscode.LogOutputChannel;
+  telemetry: TelemetryReporter;
+  command: PollardCommandId;
+}
+
+/** 0 repos → routed through classifyNotAGitRepo/presentError, undefined. 1 repo → returned directly. 2+ → a repo-picker QuickPick. */
 export async function pickRepo(
   registry: RepoRegistry,
-  title: string
+  title: string,
+  errCtx: PickRepoErrorContext
 ): Promise<RepoHandle | undefined> {
   const repos = registry.repos;
   if (repos.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No Git repository found in this workspace.');
+    presentError(classifyNotAGitRepo(), errCtx);
     return undefined;
   }
   if (repos.length === 1) return repos[0];

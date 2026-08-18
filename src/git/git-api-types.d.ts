@@ -21,11 +21,6 @@ export interface Ref {
   readonly remote?: string;
 }
 
-export interface RepositoryState {
-  readonly remotes: Remote[];
-  readonly refs: Ref[];
-}
-
 export interface Commit {
   readonly hash: string;
   readonly commitDate?: Date;
@@ -39,6 +34,13 @@ export interface UpstreamRef {
 
 export interface Branch extends Ref {
   readonly upstream?: UpstreamRef;
+}
+
+export interface RepositoryState {
+  /** Authoritative current-HEAD field: a detached HEAD has `.commit` but no `.name`. */
+  readonly HEAD: Branch | undefined;
+  readonly remotes: Remote[];
+  readonly refs: Ref[];
 }
 
 export interface Repository {

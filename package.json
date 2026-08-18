@@ -183,7 +183,7 @@
             "debug"
           ],
           "default": "info",
-          "description": "Minimum severity of diagnostic messages Pollard would record, from least to most verbose: off, error, warn, info, debug. Reserved for a future diagnostics output channel — this version does not yet produce any log output at any level."
+          "description": "Minimum severity of diagnostic messages Pollard would record, from least to most verbose: off, error, warn, info, debug. Diagnostics are written to the \"Pollard\" Output channel, which provides its own built-in level picker (the gear icon in the Output panel) — use that to control what's shown. This setting is not yet wired to that picker."
         },
         "pollard.autoScanOnStartup": {
           "type": "boolean",

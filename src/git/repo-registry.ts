@@ -12,6 +12,7 @@ export interface RepoHandle {
   remotes: RemoteInfo[];
   branches: { name: string; sha: string }[];
   currentBranch: string | undefined;
+  isDetachedHead: boolean;
 }
 
 const REFS_DEBOUNCE_MS = 400;
@@ -34,13 +35,15 @@ function toHandle(repository: Repository): RepoHandle {
     .filter((r) => r.type === REF_TYPE_HEAD && r.name && r.commit)
     .map((r) => ({ name: r.name as string, sha: r.commit as string }));
 
+  const head = repository.state.HEAD;
   return {
     id: rootPath,
     rootPath,
     label: path.basename(rootPath),
     remotes: repository.state.remotes.map((r) => ({ name: r.name, fetchUrl: r.fetchUrl })),
     branches,
-    currentBranch: repository.state.refs.find((r) => r.type === REF_TYPE_HEAD && r.commit)?.name,
+    currentBranch: head?.name,
+    isDetachedHead: head !== undefined && head.name === undefined,
   };
 }
 

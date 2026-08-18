@@ -1,6 +1,6 @@
 import type { CancellationToken } from 'vscode';
 import { ParsedRemote } from '../../git/remote-url';
-import { AuthRequiredError } from '../errors';
+import { AuthRequiredError, InsufficientScopeError } from '../../errors';
 import { fetchJson } from '../http';
 import { RateLimiter } from '../rate-limit';
 import { Provider, PullRequestInfo, RateLimitStatus } from '../types';
@@ -17,6 +17,33 @@ import {
 interface GraphQLResponse<T> {
   data: T;
   errors?: Array<{ message: string }>;
+}
+
+/**
+ * GitHub returns 403 both for scope-denied requests and for secondary rate
+ * limiting — conflating the two would corrupt the rate limiter's cooldown
+ * state on an ordinary scope problem, so this check runs first and, when it
+ * matches, short-circuits before the throttle bookkeeping ever sees the 403.
+ */
+function hasInsufficientScope<T>(
+  response: Response,
+  data: GraphQLResponse<T> | undefined
+): boolean {
+  const accepted = response.headers
+    .get('x-accepted-oauth-scopes')
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (accepted && accepted.length > 0) {
+    const granted = new Set(
+      (response.headers.get('x-oauth-scopes') ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    );
+    if (!accepted.some((s) => granted.has(s))) return true;
+  }
+  return data?.errors?.some((e) => /insufficient.*scope/i.test(e.message)) ?? false;
 }
 
 export class GitHubProvider implements Provider {
@@ -58,6 +85,7 @@ export class GitHubProvider implements Provider {
           body: { query, variables },
         }
       );
+      if (hasInsufficientScope(response, data)) throw new InsufficientScopeError('github');
       this.recordResponse(response);
       if (data?.data?.rateLimit) this.rateLimiter.updateFromGraphQLRateLimit(data.data.rateLimit);
       for (const [branch, prs] of parseBatchRefsResponse(data.data, aliasToBranch)) {
@@ -82,6 +110,7 @@ export class GitHubProvider implements Provider {
         body: { query, variables },
       }
     );
+    if (hasInsufficientScope(response, data)) throw new InsufficientScopeError('github');
     this.recordResponse(response);
     if (data?.data?.rateLimit) this.rateLimiter.updateFromGraphQLRateLimit(data.data.rateLimit);
     return data?.data?.repository?.ref !== null && data?.data?.repository?.ref !== undefined;

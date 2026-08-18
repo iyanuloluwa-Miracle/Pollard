@@ -13,12 +13,22 @@ export interface CreateProviderOptions {
   resourcePath?: string;
 }
 
+export interface CreateProviderResult {
+  provider: Provider;
+  /** Set only when the provider is a NoopProvider chosen for an explainable reason (as opposed to no remote/host configured at all being unremarkable). */
+  reason?: 'noRemote' | 'unrecognisedHost';
+}
+
 /**
  * Picks GitHub, GitLab, or a NoopProvider based on the parsed remote's host,
  * matching github.com/gitlab.com or the configured enterprise/self-hosted host.
  */
-export function createProvider({ context, remote, resourcePath }: CreateProviderOptions): Provider {
-  if (!remote) return new NoopProvider();
+export function createProvider({
+  context,
+  remote,
+  resourcePath,
+}: CreateProviderOptions): CreateProviderResult {
+  if (!remote) return { provider: new NoopProvider(), reason: 'noRemote' };
 
   const githubEnterpriseHost = getGitHubEnterpriseHost(resourcePath);
   const gitlabInstanceHost = getGitLabHost(resourcePath);
@@ -27,14 +37,18 @@ export function createProvider({ context, remote, resourcePath }: CreateProvider
     remote.host === 'github.com' ||
     (githubEnterpriseHost && remote.host === githubEnterpriseHost)
   ) {
-    return new GitHubProvider(remote, remote.host === 'github.com' ? undefined : remote.host);
+    return {
+      provider: new GitHubProvider(remote, remote.host === 'github.com' ? undefined : remote.host),
+    };
   }
   if (remote.host === 'gitlab.com' || (gitlabInstanceHost && remote.host === gitlabInstanceHost)) {
-    return new GitLabProvider(
-      context,
-      remote,
-      remote.host === 'gitlab.com' ? undefined : remote.host
-    );
+    return {
+      provider: new GitLabProvider(
+        context,
+        remote,
+        remote.host === 'gitlab.com' ? undefined : remote.host
+      ),
+    };
   }
-  return new NoopProvider();
+  return { provider: new NoopProvider(), reason: 'unrecognisedHost' };
 }

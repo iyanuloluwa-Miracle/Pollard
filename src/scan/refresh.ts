@@ -1,4 +1,5 @@
 import { getProtectedBranchPatterns } from '../config';
+import { classifyNotAGitRepo, presentError } from '../errors';
 import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branch-facts';
 import { primaryRemoteFetchUrl } from '../git/git-extension';
 import { PullRequestInfo } from '../providers/types';
@@ -17,8 +18,16 @@ export async function runRefresh({
   registry,
   branchTreeProvider,
   statusBar,
+  logChannel,
+  telemetry,
 }: ScanDeps): Promise<void> {
-  for (const repo of registry.repos) {
+  const repos = registry.repos;
+  if (repos.length === 0) {
+    presentError(classifyNotAGitRepo(), { logChannel, telemetry, command: 'pollard.refresh' });
+    return;
+  }
+
+  for (const repo of repos) {
     const defaultBranch = await resolveDefaultBranch(registry, repo);
     const protectedBranchPatterns = getProtectedBranchPatterns(repo.rootPath);
     const localFacts = await computeLocalBranchFacts(
@@ -28,7 +37,13 @@ export async function runRefresh({
       protectedBranchPatterns
     );
 
-    const cache = new RepoCache(context, repo.rootPath, primaryRemoteFetchUrl(repo.remotes));
+    const cache = new RepoCache(
+      context,
+      repo.rootPath,
+      primaryRemoteFetchUrl(repo.remotes),
+      undefined,
+      logChannel
+    );
     const prsByBranch = new Map<string, PullRequestInfo[]>();
     for (const name of localFacts.keys()) {
       const cached = await cache.getPullRequests(name);

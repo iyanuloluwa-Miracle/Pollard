@@ -11,6 +11,7 @@ import { runRefresh } from './scan/refresh';
 import { runScan } from './scan/scan';
 import { ScanDeps } from './scan/types';
 import { clearCache } from './state/cache';
+import { PollardTelemetryReporter } from './telemetry';
 import { BranchTreeElement, BranchTreeProvider } from './views/branchTree';
 import { StatusBarController } from './views/statusBar';
 
@@ -24,15 +25,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const registry = await RepoRegistry.create();
   const branchTreeProvider = new BranchTreeProvider(registry);
   const statusBar = new StatusBarController(registry);
-  const cleanLogChannel = vscode.window.createOutputChannel('Pollard');
-  const scanDeps: ScanDeps = { context, registry, branchTreeProvider, statusBar };
-  const cleanDeps: CleanDeps = { ...scanDeps, cleanLogChannel };
+  const logChannel = vscode.window.createOutputChannel('Pollard', { log: true });
+  const telemetry = new PollardTelemetryReporter(logChannel);
+  const scanDeps: ScanDeps = {
+    context,
+    registry,
+    branchTreeProvider,
+    statusBar,
+    logChannel,
+    telemetry,
+  };
+  const cleanDeps: CleanDeps = { ...scanDeps };
 
   context.subscriptions.push(
     registry,
     branchTreeProvider,
     statusBar,
-    cleanLogChannel,
+    logChannel,
+    telemetry,
     registerCleanPreviewProvider(),
     vscode.window.registerTreeDataProvider('pollard.branches', branchTreeProvider),
     vscode.commands.registerCommand('pollard.scan', () => runScan(scanDeps)),

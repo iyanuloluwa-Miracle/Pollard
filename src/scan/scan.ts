@@ -1,8 +1,15 @@
 import * as vscode from 'vscode';
 import { getProtectedBranchPatterns } from '../config';
+import {
+  AuthRequiredError,
+  classifyDetachedHead,
+  classifyError,
+  classifyNotAGitRepo,
+  classifyNotSignedIn,
+  presentError,
+} from '../errors';
 import { computeLocalBranchFacts, resolveDefaultBranch } from '../git/branch-facts';
 import { primaryRemoteFetchUrl, resolvePrimaryParsedRemote } from '../git/git-extension';
-import { AuthRequiredError, RateLimitedError } from '../providers/errors';
 import { getGithubSession } from '../providers/github/github-auth';
 import { getGitlabToken } from '../providers/gitlab/gitlab-auth';
 import { createProvider } from '../providers/provider-factory';
@@ -28,10 +35,13 @@ async function doRunScan({
   registry,
   branchTreeProvider,
   statusBar,
+  logChannel,
+  telemetry,
 }: ScanDeps): Promise<void> {
+  const errCtx = { logChannel, telemetry, command: 'pollard.scan' as const };
   const repos = registry.repos;
   if (repos.length === 0) {
-    vscode.window.showInformationMessage('Pollard: No Git repository found in this workspace.');
+    presentError(classifyNotAGitRepo(), errCtx);
     return;
   }
 
@@ -58,6 +68,9 @@ async function doRunScan({
           repo.id,
           await computeLocalBranchFacts(registry, repo, defaultBranch, protectedBranchPatterns)
         );
+        if (repo.isDetachedHead) {
+          presentError(classifyDetachedHead(repo.label), errCtx);
+        }
         progress.report({ increment: localIncrement });
       }
 
@@ -68,14 +81,20 @@ async function doRunScan({
       const prsByRepo = new Map<string, Map<string, PullRequestInfo[]>>();
       const freshPrsByRepo = new Map<string, Map<string, PullRequestInfo[]>>();
       const cachesByRepo = new Map<string, RepoCache>();
-      let anyAuthNeeded = false;
-      let signedIn = true;
+      const authNeededProviders = new Set<'github' | 'gitlab'>();
+      let offlineDetected = false;
 
       for (const repo of repos) {
         const localFacts = localFactsByRepo.get(repo.id);
         if (!localFacts) continue; // phase 1 never reached this repo (cancelled early)
 
-        const cache = new RepoCache(context, repo.rootPath, primaryRemoteFetchUrl(repo.remotes));
+        const cache = new RepoCache(
+          context,
+          repo.rootPath,
+          primaryRemoteFetchUrl(repo.remotes),
+          undefined,
+          logChannel
+        );
         cachesByRepo.set(repo.id, cache);
 
         const prMap = new Map<string, PullRequestInfo[]>();
@@ -87,21 +106,21 @@ async function doRunScan({
         }
 
         const parsedRemote = resolvePrimaryParsedRemote(repo.remotes);
-        const provider = createProvider({
+        const { provider, reason } = createProvider({
           context,
           remote: parsedRemote,
           resourcePath: repo.rootPath,
         });
+        branchTreeProvider.setProviderReason(repo.id, reason);
 
         if (provider.id !== 'noop') {
-          anyAuthNeeded = true;
           const authed =
             provider.id === 'github'
               ? !!(await getGithubSession(false))
               : !!(await getGitlabToken(context));
           if (!authed) {
-            signedIn = false;
-          } else if (uncached.length > 0 && !token.isCancellationRequested) {
+            authNeededProviders.add(provider.id);
+          } else if (uncached.length > 0 && !token.isCancellationRequested && !offlineDetected) {
             try {
               const fetched = await provider.getPullRequestsForBranches(uncached, token);
               const fresh = new Map<string, PullRequestInfo[]>();
@@ -113,11 +132,11 @@ async function doRunScan({
               freshPrsByRepo.set(repo.id, fresh);
             } catch (err) {
               if (err instanceof AuthRequiredError) {
-                signedIn = false;
-              } else if (err instanceof RateLimitedError) {
-                vscode.window.showWarningMessage(
-                  `Pollard: ${provider.id} rate limit reached — showing local + cached results only.`
-                );
+                authNeededProviders.add(err.providerId);
+              } else {
+                const classified = classifyError(err);
+                if (classified.category === 'offline') offlineDetected = true;
+                presentError(classified, errCtx);
               }
               // Any other failure: this repo just falls back to local + already-cached PR data.
             }
@@ -130,8 +149,12 @@ async function doRunScan({
       void vscode.commands.executeCommand(
         'setContext',
         'pollard.isSignedIn',
-        !anyAuthNeeded || signedIn
+        authNeededProviders.size === 0
       );
+      if (authNeededProviders.size > 0) {
+        presentError(classifyNotSignedIn(authNeededProviders), errCtx);
+      }
+      branchTreeProvider.setOfflineBanner(offlineDetected);
 
       // Phase 3 — assessing.
       progress.report({ message: 'Assessing…' });
@@ -141,7 +164,13 @@ async function doRunScan({
         const assessments = buildRepoAssessments(localFacts, prsByRepo.get(repo.id) ?? new Map());
 
         const fresh = freshPrsByRepo.get(repo.id);
-        if (fresh?.size) await cachesByRepo.get(repo.id)?.setPullRequests(fresh);
+        if (fresh?.size) {
+          try {
+            await cachesByRepo.get(repo.id)?.setPullRequests(fresh);
+          } catch (err) {
+            presentError(classifyError(err), errCtx);
+          }
+        }
 
         branchTreeProvider.updateAssessments(repo.id, assessments);
         statusBar.setRepoCounts(repo.id, tallyBucketCounts(assessments));

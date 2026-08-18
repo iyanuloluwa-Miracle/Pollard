@@ -1,4 +1,4 @@
-import { RateLimitedError } from './errors';
+import { RateLimitedError } from '../errors';
 import { RateLimitStatus } from './types';
 
 export interface GraphQLRateLimit {

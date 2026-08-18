@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { runGit } from '../git/git-exec';
 import { RepoRegistry } from '../git/repo-registry';
 
@@ -58,7 +59,8 @@ export async function writeBackupRef(
 /** Every backup ref for a repo. Never throws — returns []. */
 export async function listBackupRefs(
   registry: RepoRegistry,
-  repoId: string
+  repoId: string,
+  logChannel?: vscode.LogOutputChannel
 ): Promise<BackupRefEntry[]> {
   const dirs = registry.getGitDirs(repoId);
   if (!dirs) return [];
@@ -74,7 +76,8 @@ export async function listBackupRefs(
       .filter(Boolean)
       .map(parseBackupRefLine)
       .filter((e): e is BackupRefEntry => e !== undefined);
-  } catch {
+  } catch (err) {
+    logChannel?.trace(`listBackupRefs failed for ${repoId}: ${String(err)}`);
     return [];
   }
 }
@@ -82,7 +85,8 @@ export async function listBackupRefs(
 async function getBackupRefSha(
   registry: RepoRegistry,
   repoId: string,
-  refPath: string
+  refPath: string,
+  logChannel?: vscode.LogOutputChannel
 ): Promise<string | undefined> {
   const dirs = registry.getGitDirs(repoId);
   if (!dirs) return undefined;
@@ -93,7 +97,8 @@ async function getBackupRefSha(
       refPath,
     ]);
     return stdout.trim() || undefined;
-  } catch {
+  } catch (err) {
+    logChannel?.trace(`getBackupRefSha failed for ${refPath}: ${String(err)}`);
     return undefined;
   }
 }

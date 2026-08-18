@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { RepoRegistry } from '../git/repo-registry';
 import { PullRequestInfo } from '../providers/types';
 import { SafetyAssessment, SafetyStatus } from '../safety/engine';
+import { formatRelativeDate } from '../util/relative-time';
 
 export interface BranchAssessment {
   assessment: SafetyAssessment;
@@ -14,7 +15,8 @@ export type BranchTreeElement =
   | { kind: 'repo'; id: string; repoId: string }
   | { kind: 'bucket'; id: string; repoId: string; bucket: BucketKind }
   | { kind: 'branch'; id: string; repoId: string; branchName: string; sha: string }
-  | { kind: 'message'; id: string; repoId: string; text: string; commandId?: string };
+  | { kind: 'message'; id: string; repoId: string; text: string; commandId?: string }
+  | { kind: 'banner'; id: string; text: string };
 
 const BUCKET_ORDER: BucketKind[] = ['safe', 'squashMerged', 'warnings', 'protected', 'unscanned'];
 
@@ -80,27 +82,6 @@ export function statusIconAndColor(status: SafetyStatus): {
   return STATUS_DISPLAY[status];
 }
 
-const RELATIVE_TIME_FORMAT = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ['year', 365 * 24 * 60 * 60 * 1000],
-  ['month', 30 * 24 * 60 * 60 * 1000],
-  ['week', 7 * 24 * 60 * 60 * 1000],
-  ['day', 24 * 60 * 60 * 1000],
-  ['hour', 60 * 60 * 1000],
-  ['minute', 60 * 1000],
-  ['second', 1000],
-];
-
-function formatRelativeDate(date: Date, now = Date.now()): string {
-  const diffMs = date.getTime() - now;
-  for (const [unit, unitMs] of RELATIVE_UNITS) {
-    if (Math.abs(diffMs) >= unitMs || unit === 'second') {
-      return RELATIVE_TIME_FORMAT.format(Math.round(diffMs / unitMs), unit);
-    }
-  }
-  return RELATIVE_TIME_FORMAT.format(0, 'second');
-}
-
 function buildTooltip(branchAssessment: BranchAssessment | undefined): vscode.MarkdownString {
   if (!branchAssessment) {
     return new vscode.MarkdownString(
@@ -132,6 +113,8 @@ export class BranchTreeProvider
   private readonly disposables: vscode.Disposable[] = [];
   private readonly assessmentsByRepo = new Map<string, Map<string, BranchAssessment>>();
   private readonly scannedRepoIds = new Set<string>();
+  private readonly providerReasonByRepo = new Map<string, 'noRemote' | 'unrecognisedHost'>();
+  private offlineBannerActive = false;
 
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<BranchTreeElement | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -199,6 +182,22 @@ export class BranchTreeProvider
     return this.assessmentsByRepo.get(repoId);
   }
 
+  /** Repo-independent (machine-wide connectivity), unlike a 'message' element — explicit set/clear lifecycle. Fires a refresh only on actual state change. */
+  setOfflineBanner(active: boolean): void {
+    if (this.offlineBannerActive === active) return;
+    this.offlineBannerActive = active;
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /** Per-repo explanation for why no PR/MR data is available (no remote configured, or an unrecognised host) — reason undefined clears it. */
+  setProviderReason(repoId: string, reason: 'noRemote' | 'unrecognisedHost' | undefined): void {
+    const prev = this.providerReasonByRepo.get(repoId);
+    if (prev === reason) return;
+    if (reason === undefined) this.providerReasonByRepo.delete(repoId);
+    else this.providerReasonByRepo.set(repoId, reason);
+    this.fireRepoChange(repoId);
+  }
+
   getTreeItem(element: BranchTreeElement): vscode.TreeItem | Thenable<vscode.TreeItem> {
     switch (element.kind) {
       case 'repo':
@@ -209,6 +208,8 @@ export class BranchTreeProvider
         return this.buildBranchTreeItem(element);
       case 'message':
         return this.buildMessageTreeItem(element);
+      case 'banner':
+        return this.buildBannerTreeItem(element);
     }
   }
 
@@ -221,6 +222,7 @@ export class BranchTreeProvider
         return this.getBucketChildren(element.repoId, element.bucket);
       case 'branch':
       case 'message':
+      case 'banner':
         return [];
     }
   }
@@ -231,17 +233,30 @@ export class BranchTreeProvider
   }
 
   private getRootChildren(): BranchTreeElement[] {
+    const banner = this.offlineBannerActive ? [makeBannerElement()] : [];
     const repos = this.registry.repos;
-    if (repos.length === 0) return [];
-    if (repos.length === 1) return this.getRepoChildren(repos[0].id);
-    return repos.map((r) => makeRepoElement(r.id));
+    if (repos.length === 0) return banner;
+    if (repos.length === 1) return [...banner, ...this.getRepoChildren(repos[0].id)];
+    return [...banner, ...repos.map((r) => makeRepoElement(r.id))];
+  }
+
+  private buildProviderReasonMessage(repoId: string): BranchTreeElement[] {
+    const reason = this.providerReasonByRepo.get(repoId);
+    if (!reason) return [];
+    const text =
+      reason === 'noRemote'
+        ? 'No remote configured — showing local branch status only.'
+        : 'Remote host not recognised as GitHub/GitLab — showing local branch status only.';
+    return [makeMessageElement(repoId, `provider-reason-${reason}`, text)];
   }
 
   private getRepoChildren(repoId: string): BranchTreeElement[] {
     const repo = this.registry.repos.find((r) => r.id === repoId);
     if (!repo) return [];
+    const reasonMessage = this.buildProviderReasonMessage(repoId);
     if (!this.scannedRepoIds.has(repoId)) {
       return [
+        ...reasonMessage,
         makeMessageElement(
           repoId,
           'not-scanned',
@@ -251,7 +266,10 @@ export class BranchTreeProvider
       ];
     }
     if (repo.branches.length === 0) {
-      return [makeMessageElement(repoId, 'no-branches', 'No local branches found.')];
+      return [
+        ...reasonMessage,
+        makeMessageElement(repoId, 'no-branches', 'No local branches found.'),
+      ];
     }
 
     const assessments = this.assessmentsByRepo.get(repoId);
@@ -260,9 +278,12 @@ export class BranchTreeProvider
       const a = assessments?.get(branch.name);
       bucketsWithBranches.add(a ? statusToBucket(a.assessment.status) : 'unscanned');
     }
-    return BUCKET_ORDER.filter((b) => bucketsWithBranches.has(b)).map((b) =>
-      makeBucketElement(repoId, b)
-    );
+    return [
+      ...reasonMessage,
+      ...BUCKET_ORDER.filter((b) => bucketsWithBranches.has(b)).map((b) =>
+        makeBucketElement(repoId, b)
+      ),
+    ];
   }
 
   private getBucketChildren(repoId: string, bucket: BucketKind): BranchTreeElement[] {
@@ -350,6 +371,16 @@ export class BranchTreeProvider
     return item;
   }
 
+  private buildBannerTreeItem(
+    element: Extract<BranchTreeElement, { kind: 'banner' }>
+  ): vscode.TreeItem {
+    const item = new vscode.TreeItem(element.text, vscode.TreeItemCollapsibleState.None);
+    item.id = element.id;
+    item.iconPath = new vscode.ThemeIcon('cloud-offline', new vscode.ThemeColor('charts.orange'));
+    item.contextValue = 'pollard.banner';
+    return item;
+  }
+
   private fireRepoChange(repoId: string): void {
     if (this.registry.repos.length > 1) {
       this._onDidChangeTreeData.fire(makeRepoElement(repoId));
@@ -394,4 +425,8 @@ function makeMessageElement(
   commandId?: string
 ): BranchTreeElement {
   return { kind: 'message', id: `message:${repoId}:${slug}`, repoId, text, commandId };
+}
+
+function makeBannerElement(): BranchTreeElement {
+  return { kind: 'banner', id: 'banner:offline', text: 'Offline — showing cached results only.' };
 }
