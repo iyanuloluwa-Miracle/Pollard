@@ -66,24 +66,35 @@ export async function runPruneBackups(deps: CleanDeps): Promise<void> {
   );
   if (choice !== 'Delete') return;
 
+  const tasks = perRepo.flatMap(({ repo, stale }) => stale.map((entry) => ({ repo, entry })));
   const results: PruneResult[] = [];
-  for (const { repo, stale } of perRepo) {
-    for (const entry of stale) {
-      try {
-        await deleteBackupRef(deps.registry, repo.id, entry);
-        results.push({ repoId: repo.id, refPath: entry.refPath, ok: true });
-      } catch (err) {
-        const classified = classifyError(err);
-        logAndTrackError(classified, errCtx);
-        results.push({
-          repoId: repo.id,
-          refPath: entry.refPath,
-          ok: false,
-          error: classified.message,
-        });
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Pollard: Pruning backups',
+      cancellable: true,
+    },
+    async (progress, token) => {
+      const increment = 100 / tasks.length;
+      for (const { repo, entry } of tasks) {
+        if (token.isCancellationRequested) break;
+        try {
+          await deleteBackupRef(deps.registry, repo.id, entry);
+          results.push({ repoId: repo.id, refPath: entry.refPath, ok: true });
+        } catch (err) {
+          const classified = classifyError(err);
+          logAndTrackError(classified, errCtx);
+          results.push({
+            repoId: repo.id,
+            refPath: entry.refPath,
+            ok: false,
+            error: classified.message,
+          });
+        }
+        progress.report({ increment, message: entry.refPath });
       }
     }
-  }
+  );
 
   writePruneResultsToLog(deps.logChannel, results);
   const failed = results.filter((r) => !r.ok).length;

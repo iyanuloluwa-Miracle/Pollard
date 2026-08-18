@@ -315,11 +315,24 @@ async function runCleanFlow(
     const confirmed = await confirmDeletion(repo, candidates);
     if (!confirmed) return;
 
-    // STEP 4 — backup-then-delete, sequential per branch.
+    // STEP 4 — backup-then-delete, sequential per branch. Cancellable: a
+    // large confirmed batch can be stopped partway through.
     const results: BranchDeleteResult[] = [];
-    for (const c of candidates) {
-      results.push(await deleteWithBackup(deps, repo.id, c.branchName, c.sha, command));
-    }
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Pollard: Deleting branches in ${repo.label}`,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        const increment = 100 / candidates.length;
+        for (const c of candidates) {
+          if (token.isCancellationRequested) break;
+          results.push(await deleteWithBackup(deps, repo.id, c.branchName, c.sha, command));
+          progress.report({ increment, message: c.branchName });
+        }
+      }
+    );
     for (const r of results) {
       if (isDeleted(r)) deps.branchTreeProvider.setAssessment(r.repoId, r.branchName, undefined);
     }
