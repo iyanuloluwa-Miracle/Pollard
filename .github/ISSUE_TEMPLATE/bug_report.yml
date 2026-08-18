@@ -1,0 +1,37 @@
+name: Bug report
+description: Report something Pollard got wrong or a crash
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug in Pollard.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, if you can reproduce it.
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics report
+      description: >
+        Run **Pollard: Run Diagnostics** from the Command Palette, click
+        **Copy for Issue Report** on the notification that appears, then
+        paste the result here. This includes your Pollard/VS Code/git
+        versions, repository and provider status, and recent log output —
+        remote URLs and auth tokens are never included, only the remote
+        host and an auth status.
+      render: markdown
+    validations:
+      required: true
