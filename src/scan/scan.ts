@@ -106,40 +106,46 @@ async function doRunScan({
           else uncached.push(name);
         }
 
-        const parsedRemote = resolvePrimaryParsedRemote(repo.remotes);
-        const { provider, reason } = createProvider({
-          context,
-          remote: parsedRemote,
-          resourcePath: repo.rootPath,
-        });
-        branchTreeProvider.setProviderReason(repo.id, reason);
+        // Cache reads above always run, cancelled or not (see comment
+        // above the loop). Provider construction and auth lookups are new
+        // per-repo work, though, so once cancelled there's no reason to do
+        // them for the remaining repos.
+        if (!token.isCancellationRequested) {
+          const parsedRemote = resolvePrimaryParsedRemote(repo.remotes);
+          const { provider, reason } = createProvider({
+            context,
+            remote: parsedRemote,
+            resourcePath: repo.rootPath,
+          });
+          branchTreeProvider.setProviderReason(repo.id, reason);
 
-        if (provider.id !== 'noop') {
-          const authed =
-            provider.id === 'github'
-              ? !!(await getGithubSession(false))
-              : !!(await getGitlabToken(context));
-          if (!authed) {
-            authNeededProviders.add(provider.id);
-          } else if (uncached.length > 0 && !token.isCancellationRequested && !offlineDetected) {
-            try {
-              const fetched = await provider.getPullRequestsForBranches(uncached, token);
-              const fresh = new Map<string, PullRequestInfo[]>();
-              for (const name of uncached) {
-                const prs = fetched.get(name) ?? []; // record a miss too, so a re-scan within the TTL is free
-                prMap.set(name, prs);
-                fresh.set(name, prs);
+          if (provider.id !== 'noop') {
+            const authed =
+              provider.id === 'github'
+                ? !!(await getGithubSession(false))
+                : !!(await getGitlabToken(context));
+            if (!authed) {
+              authNeededProviders.add(provider.id);
+            } else if (uncached.length > 0 && !offlineDetected) {
+              try {
+                const fetched = await provider.getPullRequestsForBranches(uncached, token);
+                const fresh = new Map<string, PullRequestInfo[]>();
+                for (const name of uncached) {
+                  const prs = fetched.get(name) ?? []; // record a miss too, so a re-scan within the TTL is free
+                  prMap.set(name, prs);
+                  fresh.set(name, prs);
+                }
+                freshPrsByRepo.set(repo.id, fresh);
+              } catch (err) {
+                if (err instanceof AuthRequiredError) {
+                  authNeededProviders.add(err.providerId);
+                } else {
+                  const classified = classifyError(err);
+                  if (classified.category === 'offline') offlineDetected = true;
+                  presentError(classified, errCtx);
+                }
+                // Any other failure: this repo just falls back to local + already-cached PR data.
               }
-              freshPrsByRepo.set(repo.id, fresh);
-            } catch (err) {
-              if (err instanceof AuthRequiredError) {
-                authNeededProviders.add(err.providerId);
-              } else {
-                const classified = classifyError(err);
-                if (classified.category === 'offline') offlineDetected = true;
-                presentError(classified, errCtx);
-              }
-              // Any other failure: this repo just falls back to local + already-cached PR data.
             }
           }
         }
